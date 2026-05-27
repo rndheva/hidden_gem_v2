@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard — Hidden Gem Explorer</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="nav-logo"><span class="logo-icon">🌊</span><span>Hidden Gem Explorer</span></a>
+    <div class="nav-actions" id="navUserArea"></div>
+  </div>
+</nav>
+
+<div class="dashboard-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-user">
+      <div class="sidebar-avatar" id="sidebarAvatar">A</div>
+      <div class="sidebar-name" id="sidebarName">Admin</div>
+      <div class="sidebar-role">Superadmin</div>
+    </div>
+    <ul class="sidebar-nav">
+      <li class="sidebar-section-label">Overview</li>
+      <li><a href="#" class="active" onclick="showTab('overview',this)"><span class="nav-icon">📊</span> Dashboard</a></li>
+      <li class="sidebar-section-label">Manajemen</li>
+      <li><a href="#" onclick="showTab('pending',this)"><span class="nav-icon">⏳</span> Pending Users</a></li>
+      <li><a href="#" onclick="showTab('users',this)"><span class="nav-icon">👥</span> Semua Pengguna</a></li>
+      <li><a href="#" onclick="showTab('bookings',this)"><span class="nav-icon">📋</span> Semua Booking</a></li>
+      <li class="sidebar-section-label">Platform</li>
+      <li><a href="/pages/destinations.html" target="_blank"><span class="nav-icon">🗺️</span> Lihat Destinasi</a></li>
+    </ul>
+  </aside>
+
+  <!-- Content -->
+  <main class="dashboard-content">
+    <!-- OVERVIEW -->
+    <div id="tab-overview">
+      <h2 class="dashboard-title">Dashboard Admin</h2>
+      <div class="stat-cards" id="statCards">
+        <div class="stat-card"><div class="stat-card-icon">👥</div><div class="stat-card-value" id="sc-users">—</div><div class="stat-card-label">Total Pengguna</div></div>
+        <div class="stat-card"><div class="stat-card-icon">⏳</div><div class="stat-card-value" id="sc-pending">—</div><div class="stat-card-label">Menunggu Approval</div></div>
+        <div class="stat-card"><div class="stat-card-icon">📦</div><div class="stat-card-value" id="sc-packages">—</div><div class="stat-card-label">Total Paket</div></div>
+        <div class="stat-card"><div class="stat-card-icon">📋</div><div class="stat-card-value" id="sc-bookings">—</div><div class="stat-card-label">Total Booking</div></div>
+      </div>
+      <div class="card" style="box-shadow:none;border:1px solid var(--sand-dark)">
+        <div class="card-body">
+          <h3 style="color:var(--forest);margin-bottom:var(--space-md)">🌊 5 Destinasi Hidden Gem</h3>
+          <div id="destAdmin" class="table-wrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PENDING USERS -->
+    <div id="tab-pending" style="display:none">
+      <h2 class="dashboard-title">⏳ Pending Approval</h2>
+      <div id="pendingList"></div>
+    </div>
+
+    <!-- ALL USERS -->
+    <div id="tab-users" style="display:none">
+      <h2 class="dashboard-title">👥 Semua Pengguna</h2>
+      <div class="filter-bar" style="margin-bottom:var(--space-lg)">
+        <div class="form-group">
+          <label class="form-label">Role</label>
+          <select id="userRoleFilter" class="form-control">
+            <option value="">Semua</option><option>tourist</option><option>provider</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select id="userStatusFilter" class="form-control">
+            <option value="">Semua</option><option>approved</option><option>pending</option><option>rejected</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="loadUsers()">Filter</button>
+      </div>
+      <div class="table-wrap" id="usersTable"></div>
+    </div>
+
+    <!-- BOOKINGS -->
+    <div id="tab-bookings" style="display:none">
+      <h2 class="dashboard-title">📋 Semua Booking</h2>
+      <div class="table-wrap" id="bookingsTable"></div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  if (!requireAuth(['superadmin'])) {}
+
+  const user = Auth.getUser();
+  document.getElementById('sidebarAvatar').textContent = user?.fullname?.[0] || 'A';
+  document.getElementById('sidebarName').textContent   = user?.fullname || 'Admin';
+
+  function showTab(name, el) {
+    document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+    document.getElementById('tab-' + name).style.display = 'block';
+    document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+    if (el) el.classList.add('active');
+    if (name === 'pending')  loadPending();
+    if (name === 'users')    loadUsers();
+    if (name === 'bookings') loadBookings();
+  }
+
+  async function loadOverview() {
+    const [uRes, pkgRes, bRes, pendRes] = await Promise.all([
+      api('/users'),
+      api('/packages?limit=1'),
+      api('/bookings'),
+      api('/users/pending'),
+    ]);
+    if (uRes.success)    document.getElementById('sc-users').textContent    = uRes.pagination?.total || 0;
+    if (pkgRes.success)  document.getElementById('sc-packages').textContent = pkgRes.pagination?.total || 0;
+    if (bRes.success)    document.getElementById('sc-bookings').textContent = bRes.data?.length || 0;
+    if (pendRes.success) document.getElementById('sc-pending').textContent  = pendRes.data?.length || 0;
+
+    const dRes = await api('/destinations');
+    if (dRes.success) {
+      document.getElementById('destAdmin').innerHTML = `
+        <table>
+          <thead><tr><th>Nama</th><th>Lokasi</th><th>Kesulitan</th><th>WTF Score</th><th>Avg Rating</th></tr></thead>
+          <tbody>
+            ${dRes.data.map(d => `
+              <tr>
+                <td><strong>${d.name}</strong></td>
+                <td>${d.province}</td>
+                <td>${diffBadge(d.difficulty)}</td>
+                <td><span class="badge badge-forest">${Number(d.wtf_score).toFixed(1)}/5</span></td>
+                <td>${renderStars(d.avg_rating)} ${Number(d.avg_rating).toFixed(1)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>`;
+    }
+  }
+
+  async function loadPending() {
+    const res = await api('/users/pending');
+    const el  = document.getElementById('pendingList');
+    if (!res.success) { el.innerHTML = '<p>Error loading</p>'; return; }
+    if (!res.data.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p>Tidak ada akun yang menunggu approval</p></div>'; return; }
+    el.innerHTML = res.data.map(u => `
+      <div class="card" style="box-shadow:none;border:1px solid var(--sand-dark);margin-bottom:var(--space-md)">
+        <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-weight:600">${u.fullname}</div>
+            <div style="font-size:.85rem;color:var(--stone)">${u.email} &nbsp;•&nbsp; ${u.role}</div>
+            <div style="font-size:.75rem;color:var(--stone-light)">Daftar: ${fmtDate(u.created_at)}</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="updateUserStatus(${u.id},'approved',this)">✅ Setujui</button>
+            <button class="btn btn-sm" style="background:#DC3545;color:white;border-color:#DC3545" onclick="updateUserStatus(${u.id},'rejected',this)">❌ Tolak</button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  async function updateUserStatus(id, status, btn) {
+    btn.disabled = true; btn.textContent = '...';
+    const res = await api(`/users/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) });
+    if (res.success) { toast(`User ${status}`, 'success'); loadPending(); loadOverview(); }
+    else { toast(res.message, 'error'); btn.disabled = false; }
+  }
+
+  async function loadUsers() {
+    const role   = document.getElementById('userRoleFilter')?.value || '';
+    const status = document.getElementById('userStatusFilter')?.value || '';
+    let q = '?';
+    if (role)   q += `role=${role}&`;
+    if (status) q += `status=${status}&`;
+    const res = await api('/users' + q);
+    const el  = document.getElementById('usersTable');
+    if (!res.success) return;
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Bergabung</th><th>Aksi</th></tr></thead>
+        <tbody>
+          ${res.data.filter(u => u.role !== 'superadmin').map(u => `
+            <tr>
+              <td><strong>${u.fullname}</strong></td>
+              <td style="font-size:.85rem">${u.email}</td>
+              <td><span class="badge badge-sand">${u.role}</span></td>
+              <td><span class="badge ${u.status === 'approved' ? 'badge-success' : u.status === 'pending' ? 'badge-warning' : 'badge-danger'}">${u.status}</span></td>
+              <td style="font-size:.8rem">${fmtDate(u.created_at)}</td>
+              <td>
+                ${u.status !== 'approved' ? `<button class="btn btn-primary btn-sm" onclick="updateUserStatus(${u.id},'approved',this)">Setujui</button>` : ''}
+                ${u.status !== 'rejected' ? `<button class="btn btn-sm" style="background:#DC3545;color:white;border:none;border-radius:20px;padding:4px 12px;font-size:.75rem;cursor:pointer" onclick="updateUserStatus(${u.id},'rejected',this)">Tolak</button>` : ''}
+              </td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  async function loadBookings() {
+    const res = await api('/bookings');
+    const el  = document.getElementById('bookingsTable');
+    if (!res.success || !res.data.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><p>Belum ada booking</p></div>'; return; }
+    el.innerHTML = `
+      <table>
+        <thead><tr><th>Wisatawan</th><th>Paket</th><th>Destinasi</th><th>Tanggal</th><th>Peserta</th><th>Total</th><th>Status</th></tr></thead>
+        <tbody>
+          ${res.data.map(b => `
+            <tr>
+              <td><div style="font-weight:600;font-size:.875rem">${b.tourist_name}</div><div style="font-size:.75rem;color:var(--stone-light)">${b.tourist_email}</div></td>
+              <td style="font-size:.875rem">${b.package_title}</td>
+              <td style="font-size:.875rem">${b.destination_name}</td>
+              <td style="font-size:.85rem">${fmtDate(b.booking_date)}</td>
+              <td style="text-align:center">${b.participants}</td>
+              <td style="font-weight:600;font-size:.875rem">${fmtPrice(b.total_price)}</td>
+              <td><span class="badge ${b.status === 'confirmed' ? 'badge-success' : b.status === 'pending' ? 'badge-warning' : b.status === 'cancelled' ? 'badge-danger' : 'badge-sand'}">${b.status}</span></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  loadOverview();
+</script>
+</body>
+</html>

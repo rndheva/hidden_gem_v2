@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Destinasi — Hidden Gem Explorer</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="nav-logo"><span class="logo-icon">🌊</span><span>Hidden Gem Explorer</span></a>
+    <ul class="nav-links">
+      <li><a href="/">Beranda</a></li>
+      <li><a href="/pages/destinations.html" style="color:var(--forest)">Destinasi</a></li>
+      <li><a href="/pages/packages.html">Paket Trip</a></li>
+    </ul>
+    <div class="nav-actions" id="navUserArea"></div>
+    <button class="nav-hamburger"><span></span><span></span><span></span></button>
+  </div>
+  <div class="mobile-menu">
+    <a href="/">Beranda</a><a href="/pages/destinations.html">Destinasi</a><a href="/pages/packages.html">Paket Trip</a>
+    <div id="navUserArea" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+  </div>
+</nav>
+
+<div class="page-header">
+  <h1>🗺️ Destinasi Hidden Gem</h1>
+  <p>Lima air terjun tersembunyi terbaik Indonesia yang dipilih berdasarkan WTF Score eksklusif kami</p>
+</div>
+
+<section class="section">
+  <div class="container">
+    <!-- Filter -->
+    <div class="filter-bar">
+      <div class="form-group">
+        <label class="form-label">Filter Kesulitan</label>
+        <select id="filterDiff" class="form-control">
+          <option value="">Semua Level</option>
+          <option>Easy</option><option>Moderate</option><option>Hard</option><option>Expert</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Urutkan</label>
+        <select id="filterSort" class="form-control">
+          <option value="wtf">WTF Score Tertinggi</option>
+          <option value="rating">Rating Terbaik</option>
+          <option value="name">Nama A–Z</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="applyFilter()">Terapkan</button>
+    </div>
+
+    <div class="grid-3" id="destGrid">
+      <!-- skeleton -->
+      ${[1,2,3,4,5].map(() => `<div class="card"><div class="skeleton" style="height:220px"></div><div class="card-body"><div class="skeleton" style="height:20px;margin-bottom:8px"></div><div class="skeleton" style="height:14px;width:60%"></div></div></div>`).join('')}
+    </div>
+  </div>
+</section>
+
+<footer class="footer" style="padding:var(--space-xl) 0">
+  <div style="text-align:center;color:rgba(255,255,255,.4);font-size:.85rem">© 2024 Hidden Gem Explorer</div>
+</footer>
+
+<script src="/js/app.js"></script>
+<script>
+  let allDests = [];
+
+  async function loadDestinations() {
+    const res = await api('/destinations');
+    if (res.success) { allDests = res.data; renderDests(allDests); }
+    else document.getElementById('destGrid').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><p>Gagal memuat destinasi</p></div>`;
+  }
+
+  function renderDests(dests) {
+    const grid = document.getElementById('destGrid');
+    if (!dests.length) { grid.innerHTML = '<div class="empty-state"><div class="empty-icon">🌊</div><p>Tidak ada destinasi ditemukan</p></div>'; return; }
+    grid.innerHTML = dests.map(d => `
+      <a href="/pages/destination-detail.html?id=${d.id}" class="card" style="text-decoration:none;color:inherit;display:block">
+        <div style="position:relative">
+          <img class="card-img" src="${d.image_url}" alt="${d.name}" onerror="this.src='/images/placeholder.jpg'" style="height:240px;object-fit:cover;width:100%">
+          <div style="position:absolute;top:12px;left:12px">${diffBadge(d.difficulty)}</div>
+          <div style="position:absolute;top:12px;right:12px;background:rgba(28,26,23,.75);backdrop-filter:blur(4px);color:var(--leaf);font-family:var(--font-mono);font-size:.8rem;padding:4px 10px;border-radius:20px;font-weight:600">
+            WTF ${Number(d.wtf_score).toFixed(1)}
+          </div>
+        </div>
+        <div class="card-body">
+          <h3 style="color:var(--forest);margin-bottom:4px;font-size:1.25rem">${d.name}</h3>
+          <p style="font-size:.85rem;margin-bottom:var(--space-sm)">📍 ${d.location}, ${d.province}</p>
+          <p style="font-size:.875rem;color:var(--stone);margin-bottom:var(--space-md);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${d.description}</p>
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <span class="badge badge-forest">⏱ ${d.duration}</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              ${renderStars(d.avg_rating)}
+              <span style="font-size:.75rem;color:var(--stone-light)">(${d.review_count} ulasan)</span>
+            </div>
+          </div>
+        </div>
+      </a>`).join('');
+  }
+
+  function applyFilter() {
+    let filtered = [...allDests];
+    const diff = document.getElementById('filterDiff').value;
+    const sort = document.getElementById('filterSort').value;
+    if (diff) filtered = filtered.filter(d => d.difficulty === diff);
+    if (sort === 'wtf')    filtered.sort((a,b) => b.wtf_score - a.wtf_score);
+    if (sort === 'rating') filtered.sort((a,b) => b.avg_rating - a.avg_rating);
+    if (sort === 'name')   filtered.sort((a,b) => a.name.localeCompare(b.name));
+    renderDests(filtered);
+  }
+
+  loadDestinations();
+</script>
+</body>
+</html>

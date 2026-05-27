@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daftar — Hidden Gem Explorer</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-box" style="max-width:500px">
+    <div class="auth-header">
+      <div class="auth-logo">🌊 Hidden Gem Explorer</div>
+      <div class="auth-tagline">Bergabunglah dengan komunitas penjelajah Indonesia</div>
+    </div>
+    <div class="auth-body">
+      <div id="alertBox" class="alert hidden"></div>
+      <div id="successBox" style="display:none;text-align:center;padding:var(--space-lg)">
+        <div style="font-size:3rem;margin-bottom:var(--space-md)">⏳</div>
+        <h3 style="color:var(--forest);margin-bottom:var(--space-sm)">Pendaftaran Berhasil!</h3>
+        <p>Akunmu sedang menunggu persetujuan admin. Kamu akan mendapat notifikasi setelah disetujui.</p>
+        <a href="/pages/login.html" class="btn btn-primary mt-lg">Kembali ke Login</a>
+      </div>
+      <form id="registerForm">
+        <div class="form-group">
+          <label class="form-label">Nama Lengkap</label>
+          <input type="text" id="fullname" class="form-control" placeholder="Masukkan nama lengkapmu" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" id="email" class="form-control" placeholder="nama@email.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="password" class="form-control" placeholder="Min. 8 karakter" required minlength="8">
+          <span class="form-hint">Minimal 8 karakter</span>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Daftar Sebagai</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-sm)">
+            <label class="role-option" data-role="tourist">
+              <input type="radio" name="role" value="tourist" checked style="display:none">
+              <div class="role-card active" id="role-tourist">
+                <div style="font-size:1.5rem">🧭</div>
+                <div style="font-weight:600;font-size:.9rem">Wisatawan</div>
+                <div style="font-size:.75rem;color:var(--stone)">Booking paket & review</div>
+              </div>
+            </label>
+            <label class="role-option" data-role="provider">
+              <input type="radio" name="role" value="provider" style="display:none">
+              <div class="role-card" id="role-provider">
+                <div style="font-size:1.5rem">🏕️</div>
+                <div style="font-weight:600;font-size:.9rem">Travel Provider</div>
+                <div style="font-size:.75rem;color:var(--stone)">Buat & kelola paket trip</div>
+              </div>
+            </label>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary btn-full" id="submitBtn">Daftar Sekarang</button>
+      </form>
+    </div>
+    <div class="auth-footer">
+      Sudah punya akun? <a href="/pages/login.html">Masuk di sini</a>
+    </div>
+  </div>
+</div>
+
+<style>
+.role-card {
+  padding: var(--space-md); border-radius: var(--radius-md);
+  border: 2px solid var(--sand-dark); text-align: center; cursor: pointer;
+  transition: all var(--t-normal); background: white;
+}
+.role-card.active { border-color: var(--forest); background: #F0F7E6; }
+.role-card:hover  { border-color: var(--forest-light); }
+</style>
+
+<script src="/js/app.js"></script>
+<script>
+  if (Auth.isLoggedIn()) window.location.href = dashboardHref(Auth.getUser()?.role);
+
+  // Role card toggle
+  let selectedRole = 'tourist';
+  document.querySelectorAll('.role-option').forEach(opt => {
+    opt.addEventListener('click', () => {
+      selectedRole = opt.dataset.role;
+      document.querySelectorAll('.role-card').forEach(c => c.classList.remove('active'));
+      document.getElementById('role-' + selectedRole).classList.add('active');
+    });
+  });
+
+  document.getElementById('registerForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn   = document.getElementById('submitBtn');
+    const alert = document.getElementById('alertBox');
+    btn.disabled = true; btn.textContent = 'Memproses...';
+    hideAlert(alert);
+
+    const res = await api('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        fullname: document.getElementById('fullname').value,
+        email:    document.getElementById('email').value,
+        password: document.getElementById('password').value,
+        role:     selectedRole
+      })
+    });
+
+    if (res.success) {
+      document.getElementById('registerForm').style.display = 'none';
+      document.getElementById('successBox').style.display   = 'block';
+    } else {
+      showAlert(alert, res.message, 'error');
+      btn.disabled = false; btn.textContent = 'Daftar Sekarang';
+    }
+  });
+</script>
+</body>
+</html>

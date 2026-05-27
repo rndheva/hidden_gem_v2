@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detail Destinasi — Hidden Gem Explorer</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="nav-logo"><span class="logo-icon">🌊</span><span>Hidden Gem Explorer</span></a>
+    <ul class="nav-links">
+      <li><a href="/">Beranda</a></li>
+      <li><a href="/pages/destinations.html">Destinasi</a></li>
+      <li><a href="/pages/packages.html">Paket Trip</a></li>
+    </ul>
+    <div class="nav-actions" id="navUserArea"></div>
+    <button class="nav-hamburger"><span></span><span></span><span></span></button>
+  </div>
+</nav>
+
+<!-- Hero Image -->
+<div id="destHero" style="padding-top:68px">
+  <div class="skeleton" style="height:420px;border-radius:0"></div>
+</div>
+
+<div class="container" style="padding-top:var(--space-xl);padding-bottom:var(--space-2xl)">
+  <div style="display:grid;grid-template-columns:1fr 340px;gap:var(--space-xl);align-items:start" id="mainLayout">
+
+    <!-- LEFT -->
+    <div>
+      <div id="destMeta" style="margin-bottom:var(--space-xl)">
+        <div class="skeleton" style="height:40px;margin-bottom:12px"></div>
+        <div class="skeleton" style="height:20px;width:50%"></div>
+      </div>
+
+      <!-- Description -->
+      <div class="card" style="margin-bottom:var(--space-lg);box-shadow:none;border:1px solid var(--sand-dark)">
+        <div class="card-body">
+          <h3 style="color:var(--forest);margin-bottom:var(--space-md)">📖 Tentang Destinasi</h3>
+          <p id="destDescription" style="line-height:1.8;color:var(--dark-mid)"></p>
+        </div>
+      </div>
+
+      <!-- Cultural info -->
+      <div class="card" style="margin-bottom:var(--space-lg);background:var(--sand);box-shadow:none;border:1px solid var(--sand-dark)">
+        <div class="card-body">
+          <h3 style="color:var(--earth);margin-bottom:var(--space-md)">🏺 Kearifan Lokal & Budaya</h3>
+          <p id="destCulture" style="line-height:1.8;color:var(--dark-mid)"></p>
+        </div>
+      </div>
+
+      <!-- Packages -->
+      <h3 style="color:var(--forest);margin-bottom:var(--space-lg)">📦 Paket Trip Tersedia</h3>
+      <div id="packagesGrid" class="grid-2"></div>
+
+      <!-- Reviews -->
+      <div style="margin-top:var(--space-xl)">
+        <h3 style="color:var(--forest);margin-bottom:var(--space-lg)">💬 Ulasan Wisatawan</h3>
+
+        <!-- Write review (tourist only) -->
+        <div id="reviewForm" class="card" style="margin-bottom:var(--space-lg);box-shadow:none;border:1px solid var(--sand-dark);display:none">
+          <div class="card-body">
+            <h4 style="color:var(--forest);margin-bottom:var(--space-md)">Tulis Ulasanmu</h4>
+            <div class="form-group">
+              <label class="form-label">Rating</label>
+              <div class="star-input" id="starInput">
+                <input type="radio" name="rating" id="s5" value="5"><label for="s5">★</label>
+                <input type="radio" name="rating" id="s4" value="4"><label for="s4">★</label>
+                <input type="radio" name="rating" id="s3" value="3"><label for="s3">★</label>
+                <input type="radio" name="rating" id="s2" value="2"><label for="s2">★</label>
+                <input type="radio" name="rating" id="s1" value="1"><label for="s1">★</label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Komentar</label>
+              <textarea id="reviewComment" class="form-control" rows="3" placeholder="Bagikan pengalamanmu..."></textarea>
+            </div>
+            <button class="btn btn-primary" onclick="submitReview()">Kirim Ulasan</button>
+          </div>
+        </div>
+
+        <div id="reviewsList"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT SIDEBAR -->
+    <div>
+      <!-- WTF Score -->
+      <div id="wtfWidget" style="margin-bottom:var(--space-lg)"></div>
+
+      <!-- Quick info -->
+      <div class="card" style="margin-bottom:var(--space-lg);box-shadow:none;border:1px solid var(--sand-dark)">
+        <div class="card-body">
+          <h4 style="color:var(--forest);margin-bottom:var(--space-md)">ℹ️ Info Cepat</h4>
+          <div id="quickInfo" style="display:flex;flex-direction:column;gap:var(--space-sm)"></div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <a href="/pages/packages.html" id="ctaPackages" class="btn btn-primary btn-full" style="display:none">📋 Lihat Semua Paket</a>
+    </div>
+  </div>
+</div>
+
+<footer class="footer" style="padding:var(--space-xl) 0">
+  <div style="text-align:center;color:rgba(255,255,255,.4);font-size:.85rem">© 2024 Hidden Gem Explorer</div>
+</footer>
+
+<!-- Star input CSS fix -->
+<style>
+.star-input { flex-direction: row-reverse; justify-content: flex-start; }
+.star-input label:hover,
+.star-input label:hover ~ label,
+.star-input input:checked ~ label { color: #F4A623; }
+</style>
+
+<script src="/js/app.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const destId = params.get('id');
+if (!destId) window.location.href = '/pages/destinations.html';
+
+let destination = null;
+
+async function load() {
+  const res = await api(`/destinations/${destId}`);
+  if (!res.success) { toast('Destinasi tidak ditemukan', 'error'); return; }
+  destination = res.data;
+  renderDetail(destination);
+}
+
+function renderDetail(d) {
+  document.title = `${d.name} — Hidden Gem Explorer`;
+
+  // Hero
+  document.getElementById('destHero').innerHTML = `
+    <div style="position:relative;height:420px;overflow:hidden">
+      <img src="${d.image_url}" alt="${d.name}" onerror="this.src='/images/placeholder.jpg'"
+           style="width:100%;height:100%;object-fit:cover">
+      <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(28,26,23,.8) 0%,transparent 60%)"></div>
+      <div style="position:absolute;bottom:var(--space-xl);left:var(--space-xl);color:white">
+        <div style="font-family:var(--font-mono);font-size:.75rem;letter-spacing:.1em;color:var(--leaf);margin-bottom:8px">📍 ${d.location}, ${d.province}</div>
+        <h1 style="font-size:clamp(1.5rem,4vw,3rem);color:white;margin-bottom:8px">${d.name}</h1>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${diffBadge(d.difficulty)}<span class="badge badge-water">⏱ ${d.duration}</span></div>
+      </div>
+    </div>`;
+
+  document.getElementById('destMeta').innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      ${renderStars(d.avg_rating)}
+      <span style="font-weight:600">${Number(d.avg_rating).toFixed(1)}</span>
+      <span style="color:var(--stone-light);font-size:.875rem">(${d.review_count} ulasan)</span>
+      <span class="badge badge-forest">WTF ${Number(d.wtf_score).toFixed(1)}/5</span>
+    </div>`;
+
+  document.getElementById('destDescription').textContent = d.description;
+  document.getElementById('destCulture').textContent = d.culture_info;
+
+  // Quick info
+  document.getElementById('quickInfo').innerHTML = `
+    <div style="display:flex;justify-content:space-between;font-size:.875rem"><span style="color:var(--stone)">Lokasi</span><span style="font-weight:500">${d.province}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:.875rem"><span style="color:var(--stone)">Durasi Trek</span><span style="font-weight:500">${d.duration}</span></div>
+    <div style="display:flex;justify-content:space-between;font-size:.875rem"><span style="color:var(--stone)">Kesulitan</span><div>${diffBadge(d.difficulty)}</div></div>
+    <div style="display:flex;justify-content:space-between;font-size:.875rem"><span style="color:var(--stone)">Paket Tersedia</span><span style="font-weight:500">${d.packages?.length || 0} paket</span></div>`;
+
+  // WTF
+  renderWTF(document.getElementById('wtfWidget'), d.wtf_instagrammable, d.wtf_access, d.wtf_reviews);
+
+  // Packages
+  if (d.packages && d.packages.length) {
+    document.getElementById('packagesGrid').innerHTML = d.packages.map(p => `
+      <a href="/pages/package-detail.html?id=${p.id}" class="card" style="text-decoration:none;color:inherit">
+        <div class="card-body">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <h4 style="color:var(--forest)">${p.title}</h4>
+            ${diffBadge(p.difficulty)}
+          </div>
+          <p style="font-size:.8rem;color:var(--stone);margin-bottom:8px">oleh ${p.provider_name}</p>
+          <div style="font-family:var(--font-display);font-size:1.25rem;color:var(--earth);font-weight:700">${fmtPrice(p.price)}</div>
+        </div>
+      </a>`).join('');
+  } else {
+    document.getElementById('packagesGrid').innerHTML = '<p style="color:var(--stone-light)">Belum ada paket trip untuk destinasi ini.</p>';
+  }
+
+  document.getElementById('ctaPackages').style.display = 'block';
+  document.getElementById('ctaPackages').href = `/pages/packages.html?destination_id=${d.id}`;
+
+  // Reviews
+  renderReviews(d.reviews || []);
+
+  // Show review form for tourists
+  const user = Auth.getUser();
+  if (user && user.role === 'tourist') document.getElementById('reviewForm').style.display = 'block';
+}
+
+function renderReviews(reviews) {
+  const el = document.getElementById('reviewsList');
+  if (!reviews.length) { el.innerHTML = '<p style="color:var(--stone-light)">Belum ada ulasan. Jadilah yang pertama!</p>'; return; }
+  el.innerHTML = reviews.map(r => `
+    <div style="padding:var(--space-md);border:1px solid var(--sand-dark);border-radius:var(--radius-md);margin-bottom:var(--space-md);background:white">
+      <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:var(--space-sm)">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--forest-light);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.875rem">${r.reviewer_name[0]}</div>
+        <div>
+          <div style="font-weight:600;font-size:.9rem">${r.reviewer_name}</div>
+          <div style="font-size:.75rem;color:var(--stone-light)">${fmtDate(r.created_at)}</div>
+        </div>
+        <div style="margin-left:auto">${renderStars(r.rating)}</div>
+      </div>
+      <p style="font-size:.875rem;color:var(--dark-mid);margin:0">${r.comment}</p>
+    </div>`).join('');
+}
+
+async function submitReview() {
+  if (!requireAuth(['tourist'])) return;
+  const ratingEl = document.querySelector('input[name="rating"]:checked');
+  const comment  = document.getElementById('reviewComment').value.trim();
+  if (!ratingEl) { toast('Pilih rating terlebih dahulu', 'warning'); return; }
+  if (!comment)  { toast('Tulis komentar terlebih dahulu', 'warning'); return; }
+
+  const res = await api('/reviews', {
+    method: 'POST',
+    body: JSON.stringify({ destination_id: destId, rating: ratingEl.value, comment })
+  });
+
+  if (res.success) { toast('Ulasan berhasil dikirim!', 'success'); load(); }
+  else toast(res.message, 'error');
+}
+
+load();
+</script>
+</body>
+</html>

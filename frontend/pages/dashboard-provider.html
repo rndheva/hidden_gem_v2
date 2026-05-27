@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Provider Dashboard — Hidden Gem Explorer</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="nav-logo"><span class="logo-icon">🌊</span><span>Hidden Gem Explorer</span></a>
+    <div class="nav-actions" id="navUserArea"></div>
+  </div>
+</nav>
+
+<div class="dashboard-layout">
+  <aside class="sidebar">
+    <div class="sidebar-user">
+      <div class="sidebar-avatar" id="sidebarAvatar">P</div>
+      <div class="sidebar-name" id="sidebarName">Provider</div>
+      <div class="sidebar-role">Travel Provider</div>
+    </div>
+    <ul class="sidebar-nav">
+      <li><a href="#" class="active" onclick="showTab('packages',this)"><span class="nav-icon">📦</span> Paket Saya</a></li>
+      <li><a href="#" onclick="showTab('create',this)"><span class="nav-icon">➕</span> Buat Paket Baru</a></li>
+      <li class="sidebar-section-label">Navigasi</li>
+      <li><a href="/pages/destinations.html" target="_blank"><span class="nav-icon">🗺️</span> Lihat Destinasi</a></li>
+    </ul>
+  </aside>
+
+  <main class="dashboard-content">
+    <!-- MY PACKAGES -->
+    <div id="tab-packages">
+      <h2 class="dashboard-title">📦 Paket Trip Saya</h2>
+      <div id="myPackages"></div>
+    </div>
+
+    <!-- CREATE PACKAGE -->
+    <div id="tab-create" style="display:none">
+      <h2 class="dashboard-title">➕ Buat Paket Baru</h2>
+      <div class="card" style="box-shadow:none;border:1px solid var(--sand-dark)">
+        <div class="card-body">
+          <div id="createAlert" class="alert hidden"></div>
+          <form id="createForm" enctype="multipart/form-data">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md)">
+              <div class="form-group" style="grid-column:1/-1">
+                <label class="form-label">Judul Paket *</label>
+                <input type="text" id="pkgTitle" class="form-control" placeholder="cth: Trail Run Tumpak Sewu 2 Hari 1 Malam" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Destinasi *</label>
+                <select id="pkgDest" class="form-control" required></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Kesulitan *</label>
+                <select id="pkgDiff" class="form-control">
+                  <option>Easy</option><option selected>Moderate</option><option>Hard</option><option>Expert</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Harga per Orang (Rp) *</label>
+                <input type="number" id="pkgPrice" class="form-control" placeholder="500000" min="0" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Durasi *</label>
+                <input type="text" id="pkgDuration" class="form-control" placeholder="cth: 2 Hari 1 Malam" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Maks. Peserta</label>
+                <input type="number" id="pkgMaxPax" class="form-control" value="10" min="1" max="100">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Status</label>
+                <select id="pkgStatus" class="form-control">
+                  <option value="active">Aktif</option><option value="draft">Draft</option>
+                </select>
+              </div>
+              <div class="form-group" style="grid-column:1/-1">
+                <label class="form-label">Deskripsi *</label>
+                <textarea id="pkgDesc" class="form-control" rows="4" placeholder="Jelaskan paket trip ini secara detail..." required></textarea>
+              </div>
+              <div class="form-group" style="grid-column:1/-1">
+                <label class="form-label">Foto Paket</label>
+                <input type="file" id="pkgImage" class="form-control" accept="image/*">
+                <span class="form-hint">Maks. 5MB. Format: JPG, PNG, WebP</span>
+              </div>
+            </div>
+
+            <h4 style="color:var(--forest);margin:var(--space-lg) 0 var(--space-md)">🗓️ Itinerary</h4>
+            <div id="itineraryList"></div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="addItineraryRow()">+ Tambah Item</button>
+
+            <h4 style="color:var(--forest);margin:var(--space-lg) 0 var(--space-md)">✅ Sudah Termasuk</h4>
+            <div id="includesList"></div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="addListRow('includesList')">+ Tambah</button>
+
+            <h4 style="color:var(--forest);margin:var(--space-lg) 0 var(--space-md)">❌ Tidak Termasuk</h4>
+            <div id="excludesList"></div>
+            <button type="button" class="btn btn-outline btn-sm" onclick="addListRow('excludesList')">+ Tambah</button>
+
+            <div style="margin-top:var(--space-xl)">
+              <button type="submit" class="btn btn-primary btn-lg" id="submitPkg">🌿 Buat Paket</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+  if (!requireAuth(['provider'])) {}
+
+  const user = Auth.getUser();
+  document.getElementById('sidebarAvatar').textContent = user?.fullname?.[0] || 'P';
+  document.getElementById('sidebarName').textContent   = user?.fullname || 'Provider';
+
+  function showTab(name, el) {
+    document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
+    document.getElementById('tab-' + name).style.display = 'block';
+    document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+    if (el) el.classList.add('active');
+    if (name === 'packages') loadMyPackages();
+  }
+
+  async function loadDestOptions() {
+    const res = await api('/destinations');
+    const sel = document.getElementById('pkgDest');
+    if (res.success) res.data.forEach(d => {
+      const opt = document.createElement('option'); opt.value = d.id; opt.textContent = d.name; sel.appendChild(opt);
+    });
+  }
+
+  async function loadMyPackages() {
+    const res = await api('/packages/my');
+    const el  = document.getElementById('myPackages');
+    if (!res.success) { el.innerHTML = '<p>Error loading</p>'; return; }
+    if (!res.data.length) {
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><p>Belum ada paket. <a href="#" onclick="showTab('create',null)" style="color:var(--forest);font-weight:600">Buat paket pertamamu!</a></p></div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Judul</th><th>Destinasi</th><th>Harga</th><th>Kesulitan</th><th>Booking</th><th>Status</th><th>Aksi</th></tr></thead>
+          <tbody>
+            ${res.data.map(p => `
+              <tr>
+                <td><strong>${p.title}</strong></td>
+                <td style="font-size:.85rem">${p.destination_name}</td>
+                <td style="font-weight:600">${fmtPrice(p.price)}</td>
+                <td>${diffBadge(p.difficulty)}</td>
+                <td style="text-align:center">${p.booking_count}</td>
+                <td><span class="badge ${p.status === 'active' ? 'badge-success' : 'badge-sand'}">${p.status}</span></td>
+                <td>
+                  <a href="/pages/package-detail.html?id=${p.id}" class="btn btn-outline btn-sm" target="_blank">Lihat</a>
+                  <button class="btn btn-sm" style="background:#DC3545;color:white;border:none;border-radius:20px;padding:4px 12px;font-size:.75rem;cursor:pointer;margin-left:4px" onclick="deletePackage(${p.id},this)">Hapus</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  async function deletePackage(id, btn) {
+    if (!confirm('Yakin hapus paket ini?')) return;
+    btn.disabled = true;
+    const res = await api(`/packages/${id}`, { method: 'DELETE' });
+    if (res.success) { toast('Paket dihapus', 'success'); loadMyPackages(); }
+    else { toast(res.message, 'error'); btn.disabled = false; }
+  }
+
+  // Dynamic itinerary rows
+  function addItineraryRow(time='', activity='', notes='') {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:grid;grid-template-columns:120px 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
+    div.innerHTML = `
+      <input class="form-control" placeholder="07:00" value="${time}" style="font-family:var(--font-mono)">
+      <input class="form-control" placeholder="Aktivitas" value="${activity}">
+      <input class="form-control" placeholder="Catatan (opsional)" value="${notes}">
+      <button type="button" onclick="this.parentElement.remove()" style="background:#DC3545;color:white;border:none;border-radius:8px;padding:8px 12px;cursor:pointer">✕</button>`;
+    document.getElementById('itineraryList').appendChild(div);
+  }
+
+  function addListRow(listId) {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px';
+    div.innerHTML = `
+      <input class="form-control" placeholder="cth: Guide lokal berpengalaman">
+      <button type="button" onclick="this.parentElement.remove()" style="background:#DC3545;color:white;border:none;border-radius:8px;padding:8px 12px;cursor:pointer">✕</button>`;
+    document.getElementById(listId).appendChild(div);
+  }
+
+  // Initial rows
+  addItineraryRow('07:00', 'Kumpul di titik start', 'Bawa perlengkapan lengkap');
+  addItineraryRow('08:00', 'Mulai trek ke air terjun', '');
+  addListRow('includesList');
+  addListRow('excludesList');
+
+  document.getElementById('createForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn   = document.getElementById('submitPkg');
+    const alert = document.getElementById('createAlert');
+    btn.disabled = true; btn.textContent = 'Menyimpan...';
+    hideAlert(alert);
+
+    // Collect itinerary
+    const itRows = document.getElementById('itineraryList').querySelectorAll('div');
+    const itinerary = [...itRows].map(row => {
+      const inputs = row.querySelectorAll('input');
+      return { time: inputs[0].value, activity: inputs[1].value, notes: inputs[2].value };
+    }).filter(i => i.activity);
+
+    // Collect includes/excludes
+    const includes = [...document.getElementById('includesList').querySelectorAll('input')].map(i => i.value).filter(Boolean);
+    const excludes = [...document.getElementById('excludesList').querySelectorAll('input')].map(i => i.value).filter(Boolean);
+
+    const form = new FormData();
+    form.append('destination_id',  document.getElementById('pkgDest').value);
+    form.append('title',           document.getElementById('pkgTitle').value);
+    form.append('description',     document.getElementById('pkgDesc').value);
+    form.append('price',           document.getElementById('pkgPrice').value);
+    form.append('difficulty',      document.getElementById('pkgDiff').value);
+    form.append('duration',        document.getElementById('pkgDuration').value);
+    form.append('max_participants', document.getElementById('pkgMaxPax').value);
+    form.append('status',          document.getElementById('pkgStatus').value);
+    form.append('itinerary',       JSON.stringify(itinerary));
+    form.append('includes',        JSON.stringify(includes));
+    form.append('excludes',        JSON.stringify(excludes));
+    const imgFile = document.getElementById('pkgImage').files[0];
+    if (imgFile) form.append('image', imgFile);
+
+    const token = Auth.getToken();
+    const res = await fetch('/api/packages', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form
+    }).then(r => r.json());
+
+    if (res.success) {
+      toast('Paket berhasil dibuat!', 'success');
+      document.getElementById('createForm').reset();
+      showTab('packages', document.querySelector('.sidebar-nav a'));
+    } else {
+      showAlert(alert, res.message, 'error');
+    }
+    btn.disabled = false; btn.textContent = '🌿 Buat Paket';
+  });
+
+  loadDestOptions();
+  loadMyPackages();
+</script>
+</body>
+</html>

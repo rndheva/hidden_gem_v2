@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detail Paket — Hidden Gem Explorer</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="nav-logo"><span class="logo-icon">🌊</span><span>Hidden Gem Explorer</span></a>
+    <ul class="nav-links">
+      <li><a href="/">Beranda</a></li><li><a href="/pages/destinations.html">Destinasi</a></li><li><a href="/pages/packages.html">Paket Trip</a></li>
+    </ul>
+    <div class="nav-actions" id="navUserArea"></div>
+    <button class="nav-hamburger"><span></span><span></span><span></span></button>
+  </div>
+</nav>
+
+<div style="padding-top:68px" id="pageContent">
+  <div style="display:flex;align-items:center;justify-content:center;min-height:60vh">
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<!-- Booking Modal -->
+<div class="modal-overlay" id="bookingModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📅 Booking Paket</h3>
+      <button class="modal-close" onclick="closeModal('bookingModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="bookingAlert" class="alert hidden"></div>
+      <div class="form-group">
+        <label class="form-label">Tanggal Trip</label>
+        <input type="date" id="bookingDate" class="form-control" min="">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Jumlah Peserta</label>
+        <input type="number" id="bookingPax" class="form-control" value="1" min="1">
+        <span class="form-hint" id="paxHint"></span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Catatan (opsional)</label>
+        <textarea id="bookingNotes" class="form-control" rows="2" placeholder="Permintaan khusus, kondisi fisik, dll."></textarea>
+      </div>
+      <div style="background:var(--sand);padding:var(--space-md);border-radius:var(--radius-md);font-size:.875rem">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span>Harga per orang</span><span id="pricePerPax">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-weight:700;font-size:1rem;color:var(--forest)">
+          <span>Total</span><span id="totalPrice">—</span>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('bookingModal')">Batal</button>
+      <button class="btn btn-primary" onclick="confirmBooking()" id="confirmBtn">Konfirmasi Booking</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+const params = new URLSearchParams(location.search);
+const pkgId  = params.get('id');
+if (!pkgId) window.location.href = '/pages/packages.html';
+
+let pkg = null;
+
+// Set min booking date to tomorrow
+const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+document.getElementById('bookingDate').min = tomorrow.toISOString().split('T')[0];
+
+async function load() {
+  const res = await api(`/packages/${pkgId}`);
+  if (!res.success) { toast('Paket tidak ditemukan', 'error'); return; }
+  pkg = res.data;
+  render(pkg);
+}
+
+function render(p) {
+  document.title = `${p.title} — Hidden Gem Explorer`;
+
+  let itinerary = [];
+  try { itinerary = typeof p.itinerary === 'string' ? JSON.parse(p.itinerary) : (p.itinerary || []); } catch {}
+  let includes = [];
+  try { includes = typeof p.includes === 'string' ? JSON.parse(p.includes) : (p.includes || []); } catch {}
+  let excludes = [];
+  try { excludes = typeof p.excludes === 'string' ? JSON.parse(p.excludes) : (p.excludes || []); } catch {}
+
+  document.getElementById('pageContent').innerHTML = `
+    <div style="background:var(--dark);padding:var(--space-2xl) 0;position:relative;overflow:hidden">
+      ${p.image_url ? `<img src="${p.image_url}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.25">` : ''}
+      <div style="position:absolute;inset:0;background:linear-gradient(to right,rgba(28,26,23,.95) 0%,rgba(28,26,23,.5) 100%)"></div>
+      <div class="container" style="position:relative">
+        <a href="/pages/packages.html" style="color:rgba(255,255,255,.6);font-size:.875rem;display:inline-flex;align-items:center;gap:4px;margin-bottom:var(--space-md)">← Kembali ke paket</a>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">${diffBadge(p.difficulty)}<span class="badge badge-water">⏱ ${p.duration}</span></div>
+        <h1 style="color:white;margin-bottom:8px">${p.title}</h1>
+        <p style="color:rgba(255,255,255,.7)">📍 ${p.destination_name} &nbsp;•&nbsp; oleh ${p.provider_name}</p>
+      </div>
+    </div>
+
+    <div class="container" style="padding-top:var(--space-xl);padding-bottom:var(--space-2xl)">
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:var(--space-xl);align-items:start">
+        <div>
+          <div class="card" style="margin-bottom:var(--space-lg);box-shadow:none;border:1px solid var(--sand-dark)">
+            <div class="card-body">
+              <h3 style="color:var(--forest);margin-bottom:var(--space-md)">📋 Deskripsi Paket</h3>
+              <p style="line-height:1.8;color:var(--dark-mid)">${p.description}</p>
+            </div>
+          </div>
+
+          ${itinerary.length ? `
+          <div class="card" style="margin-bottom:var(--space-lg);box-shadow:none;border:1px solid var(--sand-dark)">
+            <div class="card-body">
+              <h3 style="color:var(--forest);margin-bottom:var(--space-lg)">🗓️ Itinerary</h3>
+              <div style="display:flex;flex-direction:column;gap:0">
+                ${itinerary.map((item, i) => `
+                  <div style="display:flex;gap:var(--space-md);position:relative;padding-bottom:var(--space-lg)">
+                    <div style="display:flex;flex-direction:column;align-items:center;min-width:40px">
+                      <div style="width:40px;height:40px;border-radius:50%;background:var(--forest);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.875rem;flex-shrink:0">${i+1}</div>
+                      ${i < itinerary.length - 1 ? '<div style="width:2px;flex:1;background:var(--sand-dark);margin-top:4px"></div>' : ''}
+                    </div>
+                    <div style="padding-top:8px">
+                      <div style="font-family:var(--font-mono);font-size:.75rem;color:var(--forest-light);margin-bottom:2px">${item.time || ''}</div>
+                      <div style="font-weight:600;color:var(--dark-mid);margin-bottom:2px">${item.activity || item}</div>
+                      ${item.notes ? `<div style="font-size:.8rem;color:var(--stone)">${item.notes}</div>` : ''}
+                    </div>
+                  </div>`).join('')}
+              </div>
+            </div>
+          </div>` : ''}
+
+          ${(includes.length || excludes.length) ? `
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-lg)">
+            ${includes.length ? `
+            <div class="card" style="box-shadow:none;border:1px solid var(--sand-dark)">
+              <div class="card-body">
+                <h4 style="color:var(--forest);margin-bottom:var(--space-md)">✅ Sudah Termasuk</h4>
+                <ul style="list-style:none;display:flex;flex-direction:column;gap:6px">
+                  ${includes.map(i => `<li style="font-size:.875rem;color:var(--dark-mid)">• ${i}</li>`).join('')}
+                </ul>
+              </div>
+            </div>` : ''}
+            ${excludes.length ? `
+            <div class="card" style="box-shadow:none;border:1px solid var(--sand-dark)">
+              <div class="card-body">
+                <h4 style="color:var(--earth);margin-bottom:var(--space-md)">❌ Tidak Termasuk</h4>
+                <ul style="list-style:none;display:flex;flex-direction:column;gap:6px">
+                  ${excludes.map(i => `<li style="font-size:.875rem;color:var(--dark-mid)">• ${i}</li>`).join('')}
+                </ul>
+              </div>
+            </div>` : ''}
+          </div>` : ''}
+        </div>
+
+        <!-- Booking sidebar -->
+        <div>
+          <div class="card" style="border:2px solid var(--forest)">
+            <div class="card-body">
+              <div style="font-family:var(--font-display);font-size:2rem;color:var(--earth);font-weight:700">${fmtPrice(p.price)}</div>
+              <div style="font-size:.8rem;color:var(--stone);margin-bottom:var(--space-lg)">per orang</div>
+              <div style="display:flex;flex-direction:column;gap:var(--space-sm);margin-bottom:var(--space-lg);font-size:.875rem">
+                <div style="display:flex;justify-content:space-between"><span style="color:var(--stone)">Destinasi</span><span style="font-weight:600">${p.destination_name}</span></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:var(--stone)">Durasi</span><span>${p.duration}</span></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:var(--stone)">Max Peserta</span><span>${p.max_participants} orang</span></div>
+                <div style="display:flex;justify-content:space-between"><span style="color:var(--stone)">Kesulitan</span>${diffBadge(p.difficulty)}</div>
+              </div>
+              ${Auth.isLoggedIn() && Auth.getUser()?.role === 'tourist'
+                ? `<button class="btn btn-primary btn-full" onclick="openBooking()">📅 Booking Sekarang</button>`
+                : `<a href="/pages/login.html" class="btn btn-outline btn-full">Login untuk Booking</a>`}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function openBooking() {
+  if (!requireAuth(['tourist'])) return;
+  document.getElementById('pricePerPax').textContent = fmtPrice(pkg.price);
+  document.getElementById('paxHint').textContent = `Maks. ${pkg.max_participants} peserta`;
+  document.getElementById('bookingPax').max = pkg.max_participants;
+  updateTotal();
+  openModal('bookingModal');
+}
+
+function updateTotal() {
+  const pax = parseInt(document.getElementById('bookingPax').value) || 1;
+  document.getElementById('totalPrice').textContent = fmtPrice(pkg.price * pax);
+}
+
+document.getElementById('bookingPax').addEventListener('input', updateTotal);
+
+async function confirmBooking() {
+  const btn   = document.getElementById('confirmBtn');
+  const alert = document.getElementById('bookingAlert');
+  hideAlert(alert);
+
+  const booking_date  = document.getElementById('bookingDate').value;
+  const participants  = document.getElementById('bookingPax').value;
+  const notes         = document.getElementById('bookingNotes').value;
+
+  if (!booking_date) { showAlert(alert, 'Pilih tanggal trip terlebih dahulu', 'error'); return; }
+
+  btn.disabled = true; btn.textContent = 'Memproses...';
+  const res = await api('/bookings', {
+    method: 'POST',
+    body: JSON.stringify({ package_id: pkgId, booking_date, participants, notes })
+  });
+
+  if (res.success) {
+    closeModal('bookingModal');
+    toast(`Booking berhasil! Total: ${fmtPrice(res.data.total_price)}`, 'success', 5000);
+    setTimeout(() => window.location.href = '/pages/dashboard-tourist.html', 2000);
+  } else {
+    showAlert(alert, res.message, 'error');
+    btn.disabled = false; btn.textContent = 'Konfirmasi Booking';
+  }
+}
+
+load();
+</script>
+</body>
+</html>

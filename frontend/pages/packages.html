@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Paket Trip — Hidden Gem Explorer</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="nav-logo"><span class="logo-icon">🌊</span><span>Hidden Gem Explorer</span></a>
+    <ul class="nav-links">
+      <li><a href="/">Beranda</a></li>
+      <li><a href="/pages/destinations.html">Destinasi</a></li>
+      <li><a href="/pages/packages.html" style="color:var(--forest)">Paket Trip</a></li>
+    </ul>
+    <div class="nav-actions" id="navUserArea"></div>
+    <button class="nav-hamburger"><span></span><span></span><span></span></button>
+  </div>
+</nav>
+
+<div class="page-header">
+  <h1>📦 Paket Trail Running</h1>
+  <p>Temukan paket trip yang sesuai dengan level dan budgetmu dari travel provider terpercaya</p>
+</div>
+
+<section class="section">
+  <div class="container">
+    <div class="filter-bar">
+      <div class="form-group">
+        <label class="form-label">Destinasi</label>
+        <select id="filterDest" class="form-control"><option value="">Semua Destinasi</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Kesulitan</label>
+        <select id="filterDiff" class="form-control">
+          <option value="">Semua Level</option>
+          <option>Easy</option><option>Moderate</option><option>Hard</option><option>Expert</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" onclick="loadPackages()">Cari</button>
+    </div>
+
+    <div id="packagesGrid" class="grid-3">
+      <div class="card"><div class="skeleton" style="height:200px"></div><div class="card-body"><div class="skeleton" style="height:20px;margin-bottom:8px"></div><div class="skeleton" style="height:14px;width:60%"></div></div></div>
+      <div class="card"><div class="skeleton" style="height:200px"></div><div class="card-body"><div class="skeleton" style="height:20px;margin-bottom:8px"></div><div class="skeleton" style="height:14px;width:60%"></div></div></div>
+      <div class="card"><div class="skeleton" style="height:200px"></div><div class="card-body"><div class="skeleton" style="height:20px;margin-bottom:8px"></div><div class="skeleton" style="height:14px;width:60%"></div></div></div>
+    </div>
+
+    <div id="pagination" style="display:flex;justify-content:center;gap:8px;margin-top:var(--space-xl)"></div>
+  </div>
+</section>
+
+<footer class="footer" style="padding:var(--space-xl) 0">
+  <div style="text-align:center;color:rgba(255,255,255,.4);font-size:.85rem">© 2024 Hidden Gem Explorer</div>
+</footer>
+
+<script src="/js/app.js"></script>
+<script>
+let currentPage = 1;
+
+// Pre-filter from URL param
+const urlParams = new URLSearchParams(location.search);
+const preDestId = urlParams.get('destination_id');
+
+async function initFilters() {
+  const res = await api('/destinations');
+  if (res.success) {
+    const sel = document.getElementById('filterDest');
+    res.data.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.id; opt.textContent = d.name;
+      if (String(d.id) === preDestId) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+}
+
+async function loadPackages(page = 1) {
+  currentPage = page;
+  const destId = document.getElementById('filterDest').value;
+  const diff   = document.getElementById('filterDiff').value;
+  let q = `?page=${page}&limit=9`;
+  if (destId) q += `&destination_id=${destId}`;
+  if (diff)   q += `&difficulty=${encodeURIComponent(diff)}`;
+
+  const res = await api('/packages' + q);
+  const grid = document.getElementById('packagesGrid');
+
+  if (!res.success) { grid.innerHTML = '<p>Gagal memuat paket</p>'; return; }
+  if (!res.data.length) {
+    grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div class="empty-icon">📦</div><p>Belum ada paket trip tersedia</p></div>`;
+    document.getElementById('pagination').innerHTML = '';
+    return;
+  }
+
+  grid.innerHTML = res.data.map(p => `
+    <a href="/pages/package-detail.html?id=${p.id}" class="card" style="text-decoration:none;color:inherit">
+      <div style="position:relative">
+        <img class="card-img" src="${p.image_url || '/images/placeholder.jpg'}" alt="${p.title}" onerror="this.src='/images/placeholder.jpg'" style="height:200px;object-fit:cover;width:100%">
+        <div style="position:absolute;top:10px;left:10px">${diffBadge(p.difficulty)}</div>
+      </div>
+      <div class="card-body">
+        <div style="font-size:.75rem;color:var(--stone-light);margin-bottom:4px">📍 ${p.destination_name}</div>
+        <h3 style="color:var(--forest);font-size:1.1rem;margin-bottom:4px">${p.title}</h3>
+        <p style="font-size:.8rem;color:var(--stone);margin-bottom:var(--space-md)">oleh ${p.provider_name} • ⏱ ${p.duration}</p>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div style="font-family:var(--font-display);font-size:1.3rem;color:var(--earth);font-weight:700">${fmtPrice(p.price)}</div>
+          <span class="btn btn-outline btn-sm">Lihat</span>
+        </div>
+      </div>
+    </a>`).join('');
+
+  // Pagination
+  const { total, limit } = res.pagination;
+  const pages = Math.ceil(total / limit);
+  const pag   = document.getElementById('pagination');
+  if (pages <= 1) { pag.innerHTML = ''; return; }
+  pag.innerHTML = Array.from({ length: pages }, (_, i) => i + 1).map(p =>
+    `<button onclick="loadPackages(${p})" class="btn ${p === currentPage ? 'btn-primary' : 'btn-outline'} btn-sm">${p}</button>`
+  ).join('');
+}
+
+initFilters().then(() => loadPackages());
+</script>
+</body>
+</html>
