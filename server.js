@@ -7,9 +7,13 @@ const fs         = require('fs');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
-// ── Ensure upload directory exists ──────────────────────────
-const uploadDir = path.join(__dirname, 'frontend/images/uploads');
-if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+// ── Ensure upload directory exists (Hanya berjalan jika BUKAN di Vercel) ──
+if (!process.env.VERCEL) {
+  const uploadDir = path.join(__dirname, 'frontend/images/uploads');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+}
 
 // ── Middleware ───────────────────────────────────────────────
 app.use(cors({
@@ -53,7 +57,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`
 ╔══════════════════════════════════════════════╗
-║     🌊  Hidden Gem Explorer  🌿              ║
+║    🌊   Hidden Gem Explorer  🌿              ║
 ║  Server running on http://localhost:${PORT}     ║
 ║  Environment: ${(process.env.NODE_ENV || 'development').padEnd(29)}║
 ╚══════════════════════════════════════════════╝
