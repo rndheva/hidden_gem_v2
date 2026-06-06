@@ -206,7 +206,8 @@ async function confirmBooking() {
 
   if (!booking_date) { showAlert(alert, 'Pilih tanggal trip terlebih dahulu', 'error'); return; }
 
-  btn.disabled = true; btn.textContent = 'Memproses...';
+  btn.disabled = true; btn.textContent = 'Memproses Pembayaran...';
+  
   const res = await api('/bookings', {
     method: 'POST',
     body: JSON.stringify({ package_id: pkgId, booking_date, participants, notes })
@@ -214,8 +215,17 @@ async function confirmBooking() {
 
   if (res.success) {
     closeModal('bookingModal');
-    toast(`Booking berhasil! Total: ${fmtPrice(res.data.total_price)}`, 'success', 5000);
-    setTimeout(() => window.location.href = '/pages/dashboard-tourist.html', 2000);
+    toast('Booking berhasil dibuat! Mengalihkan ke gerbang pembayaran...', 'success', 3000);
+    
+
+    if (res.data && res.data.paymentUrl) {
+      setTimeout(() => {
+        window.location.href = res.data.paymentUrl;
+      }, 1500);
+    } else {
+      // Fallback jika paymentUrl ternyata kosong, masuk ke dashboard biasa
+      setTimeout(() => window.location.href = '/pages/dashboard-tourist.html', 2000);
+    }
   } else {
     showAlert(alert, res.message, 'error');
     btn.disabled = false; btn.textContent = 'Konfirmasi Booking';

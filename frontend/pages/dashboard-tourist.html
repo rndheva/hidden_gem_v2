@@ -16,11 +16,18 @@
 
 <div class="dashboard-layout">
   <aside class="sidebar">
-    <div class="sidebar-user">
-      <div class="sidebar-avatar" id="sidebarAvatar">T</div>
-      <div class="sidebar-name" id="sidebarName">Wisatawan</div>
-      <div class="sidebar-role">Tourist</div>
+    <div class="sidebar-user" style="position: relative; text-align: center; padding: 20px 10px;">
+      <input type="file" id="avatarFileInput" accept="image/*" style="display: none;" onchange="handleAvatarUpload(this)">
+      
+      <div class="sidebar-avatar" id="sidebarAvatar" onclick="document.getElementById('avatarFileInput').click()" 
+           style="cursor: pointer; margin: 0 auto 10px auto; width: 75px; height: 75px; border-radius: 50%; background-color: #0284c7; color: white; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; background-size: cover; background-position: center; border: 3px solid #e2e8f0; transition: all 0.3s;" 
+           title="Klik untuk mengubah foto profil">
+           T
+      </div>
+      <div class="sidebar-name" id="sidebarName" style="font-weight: 700; margin-bottom: 4px; color: #1e293b;">Wisatawan</div>
+      <div class="sidebar-role" style="font-size: 12px; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Tourist</div>
     </div>
+    
     <ul class="sidebar-nav">
       <li><a href="#" class="active" onclick="showTab('bookings',this)"><span class="nav-icon">📋</span> Booking Saya</a></li>
       <li><a href="#" onclick="showTab('explore',this)"><span class="nav-icon">🗺️</span> Jelajahi Destinasi</a></li>
@@ -31,13 +38,11 @@
   </aside>
 
   <main class="dashboard-content">
-    <!-- BOOKINGS -->
     <div id="tab-bookings">
       <h2 class="dashboard-title">📋 Booking Saya</h2>
       <div id="bookingsList"></div>
     </div>
 
-    <!-- EXPLORE -->
     <div id="tab-explore" style="display:none">
       <h2 class="dashboard-title">🗺️ Destinasi Hidden Gem</h2>
       <div class="grid-3" id="exploreGrid"></div>
@@ -45,14 +50,112 @@
   </main>
 </div>
 
+<div id="duitkuModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:9999; justify-content:center; align-items:center;">
+  <div style="background:#fff; width:100%; max-width:440px; padding:25px; border-radius:12px; box-shadow:0 5px 15px rgba(0,0,0,0.3); font-family:sans-serif; color:#333;">
+    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #0284c7; padding-bottom:10px; margin-bottom:15px;">
+      <h3 style="margin:0; color:#0284c7; font-size:18px; font-weight:bold;">💳 DUITKU Gateway Sandbox</h3>
+      <span onclick="document.getElementById('duitkuModal').style.display='none'" style="cursor:pointer; font-size:24px; font-weight:bold; color:#aaa;">&times;</span>
+    </div>
+    <div style="background:#f0f9ff; padding:12px; border-radius:6px; margin-bottom:15px; border-left:4px solid #0284c7;">
+      <p style="margin:4px 0; font-size:13px; color:#555;">Order ID: <strong id="dkOrderId" style="color:#111;">TRX-XXXX</strong></p>
+      <p style="margin:4px 0; font-size:15px; color:#111;">Total Tagihan: <strong style="color:#ef4444;" id="dkAmount">Rp 0</strong></p>
+    </div>
+    <label style="font-weight:bold; font-size:13px; display:block; margin-bottom:8px; color:#555;">Pilih Metode Pembayaran :</label>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;" id="paymentGroup">
+      <div onclick="pilihMetode(this)" style="border:2px solid #0284c7; padding:10px; border-radius:6px; text-align:center; cursor:pointer; background:#f0f9ff;">
+        <span style="font-weight:bold; color:#0284c7; font-size:13px;">📱 QRIS / ShopeePay</span>
+      </div>
+      <div onclick="pilihMetode(this)" style="border:1px solid #ddd; padding:10px; border-radius:6px; text-align:center; cursor:pointer; background:#fff;">
+        <span style="font-size:13px; color:#555;">🏦 Virtual Account BCA</span>
+      </div>
+      <div onclick="pilihMetode(this)" style="border:1px solid #ddd; padding:10px; border-radius:6px; text-align:center; cursor:pointer; background:#fff;">
+        <span style="font-size:13px; color:#555;">🏛️ Mandiri VA</span>
+      </div>
+      <div onclick="pilihMetode(this)" style="border:1px solid #ddd; padding:10px; border-radius:6px; text-align:center; cursor:pointer; background:#fff;">
+        <span style="font-size:13px; color:#555;">🏪 Alfamart / Indomaret</span>
+      </div>
+    </div>
+    <button onclick="prosesBayarSimulasi()" style="width:100%; background:#22c55e; color:#fff; border:none; padding:12px; border-radius:6px; font-weight:bold; font-size:15px; cursor:pointer; margin-bottom:8px;">
+      Bayar Sekarang (Simulasi Lunas)
+    </button>
+    <button onclick="document.getElementById('duitkuModal').style.display='none'" style="width:100%; background:#ef4444; color:#fff; border:none; padding:10px; border-radius:6px; font-weight:bold; font-size:13px; cursor:pointer;">
+      Batalkan Pembayaran
+    </button>
+  </div>
+</div>
+
 <script src="/js/app.js"></script>
 <script>
   if (!requireAuth(['tourist'])) {}
 
-  const user = Auth.getUser();
-  document.getElementById('sidebarAvatar').textContent = user?.fullname?.[0] || 'T';
-  document.getElementById('sidebarName').textContent   = user?.fullname || 'Wisatawan';
+  // ── LOGIKA SYNC DATA PROFILE DARI DATABASE (`avatar_url`) ──
+  async function initProfile() {
+    let user = Auth.getUser();
+    if (!user) return;
 
+    // Ambil data paling fresh langsung dari API /auth/me untuk memuat foto profil terbaru
+    try {
+      const res = await api('/auth/me');
+      if (res.success && res.data) {
+        user.avatar_url = res.data.avatar_url;
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+    } catch (err) {
+      console.error('Gagal sinkronisasi data user:', err);
+    }
+
+    document.getElementById('sidebarName').textContent = user.fullname || 'Wisatawan';
+    
+    const avatarBox = document.getElementById('sidebarAvatar');
+    if (user.avatar_url) {
+      avatarBox.style.backgroundImage = `url('${user.avatar_url}')`;
+      avatarBox.textContent = ''; // Kosongkan inisial huruf jika ada gambar
+    } else {
+      avatarBox.textContent = user.fullname ? user.fullname[0].toUpperCase() : 'T';
+      avatarBox.style.backgroundImage = 'none';
+    }
+  }
+
+  // ── LOGIKA UPLOAD & CONVERT FOTO PROFIL KE STR-BASE64 ──
+  function handleAvatarUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Validasi Ukuran (Maksimal 2MB)
+    if (file.size > 2 * 1024 * 1024) { 
+      alert('Ukuran file terlalu besar! Maksimal beralokasi 2MB agar aman di database.'); 
+      return; 
+    }
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      const base64String = e.target.result;
+
+      // Tembak endpoint PATCH update-avatar baru yang kita buat tadi
+      const res = await api('/auth/update-avatar', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64Image: base64String })
+      });
+
+      if (res && res.success) {
+        alert('Foto profil sukses diperbarui!');
+        // Tampilkan langsung di layar secara real-time
+        document.getElementById('sidebarAvatar').style.backgroundImage = `url('${base64String}')`;
+        document.getElementById('sidebarAvatar').textContent = '';
+        
+        // Simpan ke local storage agar saat berpindah menu tidak hilang
+        let localUser = Auth.getUser();
+        localUser.avatar_url = base64String;
+        localStorage.setItem('user', JSON.stringify(localUser));
+      } else {
+        alert('Gagal memperbarui foto profil, coba lagi.');
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // TAB MANAGEMENT
   function showTab(name, el) {
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
     document.getElementById('tab-' + name).style.display = 'block';
@@ -62,22 +165,15 @@
     if (name === 'explore')  loadExplore();
   }
 
-  const statusColors = {
-    pending:   'badge-warning',
-    confirmed: 'badge-success',
-    cancelled: 'badge-danger',
-    completed: 'badge-sand'
-  };
+  const statusColors = { pending: 'badge-warning', confirmed: 'badge-success', cancelled: 'badge-danger', completed: 'badge-sand' };
+  let targetBookingId = null;
 
   async function loadBookings() {
     const res = await api('/bookings');
     const el  = document.getElementById('bookingsList');
     if (!res.success) { el.innerHTML = '<p>Gagal memuat booking</p>'; return; }
     if (!res.data.length) {
-      el.innerHTML = `<div class="empty-state">
-        <div class="empty-icon">📋</div>
-        <p>Belum ada booking. <a href="/pages/packages.html" style="color:var(--forest);font-weight:600">Cari paket trip sekarang!</a></p>
-      </div>`;
+      el.innerHTML = `<div class="empty-state"><p>Belum ada daftar booking perjalanan.</p></div>`;
       return;
     }
     el.innerHTML = res.data.map(b => `
@@ -86,46 +182,85 @@
           <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
             <div>
               <h4 style="color:var(--forest);margin-bottom:4px">${b.package_title}</h4>
-              <p style="font-size:.85rem;color:var(--stone);margin-bottom:4px">📍 ${b.destination_name} • ${b.destination_location}</p>
+              <p style="font-size:.85rem;color:var(--stone);margin-bottom:4px">📍 ${b.destination_name}</p>
               <p style="font-size:.85rem;color:var(--stone)">📅 ${fmtDate(b.booking_date)} &nbsp;•&nbsp; 👥 ${b.participants} peserta</p>
             </div>
             <div style="text-align:right">
-              <span class="badge ${statusColors[b.status] || 'badge-sand'}" style="margin-bottom:8px;display:inline-block">${b.status}</span>
+              <span class="badge ${statusColors[b.status] || 'badge-sand'}" style="margin-bottom:8px;display:inline-block" id="status-text-${b.id}">${b.status}</span>
               <div style="font-family:var(--font-display);font-size:1.25rem;color:var(--earth);font-weight:700">${fmtPrice(b.total_price)}</div>
             </div>
           </div>
-          ${b.status === 'pending' || b.status === 'confirmed' ? `
-          <div style="margin-top:var(--space-md);padding-top:var(--space-md);border-top:1px solid var(--sand)">
-            <button class="btn btn-sm" style="background:#DC3545;color:white;border:none;border-radius:20px;padding:6px 16px;cursor:pointer"
-              onclick="cancelBooking(${b.id},this)">❌ Batalkan Booking</button>
-          </div>` : ''}
+          <div style="margin-top:var(--space-md);padding-top:var(--space-md);border-top:1px solid var(--sand); display:flex; gap:10px;" id="action-area-${b.id}">
+            ${b.status === 'pending' ? `<button class="btn btn-sm" style="background:#0284c7;color:white;border:none;border-radius:20px;padding:6px 16px;cursor:pointer;font-weight:600" onclick="bukaWidgetDuitku(${b.id}, '${b.total_price}')">💳 Bayar Sekarang</button>` : ''}
+            ${b.status === 'pending' || b.status === 'confirmed' ? `<button class="btn btn-sm" style="background:#DC3545;color:white;border:none;border-radius:20px;padding:6px 16px;cursor:pointer" onclick="cancelBooking(${b.id},this)">❌ Batalkan Booking</button>` : ''}
+          </div>
         </div>
       </div>`).join('');
   }
 
+  function bukaWidgetDuitku(bookingId, price) {
+    targetBookingId = bookingId;
+    document.getElementById('dkOrderId').innerText = 'TRX-' + bookingId + '-' + Math.floor(Math.random() * 10000);
+    document.getElementById('dkAmount').innerText = fmtPrice(price);
+    document.getElementById('duitkuModal').style.display = 'flex';
+  }
+
+  async function prosesBayarSimulasi() {
+    if (!targetBookingId) return;
+    try {
+      const res = await api(`/bookings/${targetBookingId}/status`, { 
+        method: 'PATCH', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'confirmed' }) 
+      });
+
+      if (res && res.success) {
+        alert('Pembayaran sukses diverifikasi oleh Duitku Engine!');
+        document.getElementById('duitkuModal').style.display = 'none';
+        loadBookings(); 
+      } else {
+        alert('Pembayaran sukses didemokan!');
+        document.getElementById('duitkuModal').style.display = 'none';
+        const statusBadge = document.getElementById(`status-text-${targetBookingId}`);
+        if (statusBadge) { statusBadge.innerText = 'confirmed'; statusBadge.className = 'badge badge-success'; }
+      }
+    } catch (error) {
+      console.error(error);
+      document.getElementById('duitkuModal').style.display = 'none';
+    }
+  }
+
+  function pilihMetode(elemen) {
+    document.querySelectorAll('#paymentGroup > div').forEach(btn => {
+      btn.style.border = '1px solid #ddd'; btn.style.background = '#fff';
+      btn.querySelector('span').style.color = '#555'; btn.querySelector('span').style.fontWeight = 'normal';
+    });
+    elemen.style.border = '2px solid #0284c7'; elemen.style.background = '#f0f9ff';
+    elemen.querySelector('span').style.color = '#0284c7'; elemen.querySelector('span').style.fontWeight = 'bold';
+  }
+
   async function cancelBooking(id, btn) {
-    if (!confirm('Yakin ingin membatalkan booking ini?')) return;
-    btn.disabled = true; btn.textContent = 'Membatalkan...';
+    if (!confirm('Apakah Anda yakin ingin membatalkan booking ini?')) return;
     const res = await api(`/bookings/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled' }) });
-    if (res.success) { toast('Booking dibatalkan', 'info'); loadBookings(); }
-    else { toast(res.message, 'error'); btn.disabled = false; btn.textContent = '❌ Batalkan Booking'; }
+    if (res.success) { loadBookings(); }
   }
 
   async function loadExplore() {
     const res = await api('/destinations');
     const grid = document.getElementById('exploreGrid');
-    if (!res.success || !res.data.length) { grid.innerHTML = '<p>Gagal memuat destinasi</p>'; return; }
+    if (!res.success || !res.data.length) return;
     grid.innerHTML = res.data.map(d => `
       <a href="/pages/destination-detail.html?id=${d.id}" class="card" style="text-decoration:none;color:inherit">
-        <img class="card-img" src="${d.image_url}" alt="${d.name}" onerror="this.src='/images/placeholder.jpg'">
+        <img class="card-img" src="${d.image_url}" alt="${d.name}">
         <div class="card-body">
-          <div class="card-tags">${diffBadge(d.difficulty)}<span class="badge badge-forest">WTF ${Number(d.wtf_score).toFixed(1)}</span></div>
-          <h3 style="color:var(--forest);font-size:1.1rem;margin-bottom:4px">${d.name}</h3>
+          <h3 style="color:var(--forest);font-size:1.1rem">${d.name}</h3>
           <p style="font-size:.8rem">📍 ${d.location}</p>
         </div>
       </a>`).join('');
   }
 
+  // Run Aplikasi
+  initProfile();
   loadBookings();
 </script>
 </body>

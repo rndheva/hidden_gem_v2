@@ -15,13 +15,19 @@
 </nav>
 
 <div class="dashboard-layout">
-  <!-- Sidebar -->
   <aside class="sidebar">
-    <div class="sidebar-user">
-      <div class="sidebar-avatar" id="sidebarAvatar">A</div>
-      <div class="sidebar-name" id="sidebarName">Admin</div>
-      <div class="sidebar-role">Superadmin</div>
+    <div class="sidebar-user" style="position: relative; text-align: center; padding: 20px 10px;">
+      <input type="file" id="avatarFileInput" accept="image/*" style="display: none;" onchange="handleAvatarUpload(this)">
+      
+      <div class="sidebar-avatar" id="sidebarAvatar" onclick="document.getElementById('avatarFileInput').click()" 
+           style="cursor: pointer; margin: 0 auto 10px auto; width: 75px; height: 75px; border-radius: 50%; background-color: #0284c7; color: white; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: bold; background-size: cover; background-position: center; border: 3px solid #e2e8f0; transition: all 0.3s;" 
+           title="Klik untuk mengubah foto profil">
+           A
+      </div>
+      <div class="sidebar-name" id="sidebarName" style="font-weight: 700; margin-bottom: 4px; color: #1e293b;">Admin</div>
+      <div class="sidebar-role" style="font-size: 12px; color: #64748b; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;">Superadmin</div>
     </div>
+
     <ul class="sidebar-nav">
       <li class="sidebar-section-label">Overview</li>
       <li><a href="#" class="active" onclick="showTab('overview',this)"><span class="nav-icon">📊</span> Dashboard</a></li>
@@ -34,9 +40,7 @@
     </ul>
   </aside>
 
-  <!-- Content -->
   <main class="dashboard-content">
-    <!-- OVERVIEW -->
     <div id="tab-overview">
       <h2 class="dashboard-title">Dashboard Admin</h2>
       <div class="stat-cards" id="statCards">
@@ -53,13 +57,11 @@
       </div>
     </div>
 
-    <!-- PENDING USERS -->
     <div id="tab-pending" style="display:none">
       <h2 class="dashboard-title">⏳ Pending Approval</h2>
       <div id="pendingList"></div>
     </div>
 
-    <!-- ALL USERS -->
     <div id="tab-users" style="display:none">
       <h2 class="dashboard-title">👥 Semua Pengguna</h2>
       <div class="filter-bar" style="margin-bottom:var(--space-lg)">
@@ -80,7 +82,6 @@
       <div class="table-wrap" id="usersTable"></div>
     </div>
 
-    <!-- BOOKINGS -->
     <div id="tab-bookings" style="display:none">
       <h2 class="dashboard-title">📋 Semua Booking</h2>
       <div class="table-wrap" id="bookingsTable"></div>
@@ -92,10 +93,73 @@
 <script>
   if (!requireAuth(['superadmin'])) {}
 
-  const user = Auth.getUser();
-  document.getElementById('sidebarAvatar').textContent = user?.fullname?.[0] || 'A';
-  document.getElementById('sidebarName').textContent   = user?.fullname || 'Admin';
+  // ── LOGIKA SYNC DATA PROFILE DARI DATABASE (`avatar_url`) ──
+  async function initProfile() {
+    let user = Auth.getUser();
+    if (!user) return;
 
+    // Ambil data paling baru langsung dari database via API /auth/me
+    try {
+      const res = await api('/auth/me');
+      if (res.success && res.data) {
+        user.avatar_url = res.data.avatar_url;
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+    } catch (err) {
+      console.error('Gagal sinkronisasi data user:', err);
+    }
+
+    document.getElementById('sidebarName').textContent = user.fullname || 'Admin';
+    
+    const avatarBox = document.getElementById('sidebarAvatar');
+    if (user.avatar_url) {
+      avatarBox.style.backgroundImage = `url('${user.avatar_url}')`;
+      avatarBox.textContent = ''; // Hapus huruf default jika gambar ada
+    } else {
+      avatarBox.textContent = user.fullname ? user.fullname[0].toUpperCase() : 'A';
+      avatarBox.style.backgroundImage = 'none';
+    }
+  }
+
+  // ── LOGIKA UPLOAD & CONVERT PROFILE KE BASE64 ──
+  function handleAvatarUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    // Validasi Ukuran (Maksimal 2MB)
+    if (file.size > 2 * 1024 * 1024) { 
+      alert('Ukuran file terlalu besar! Maksimal 2MB agar aman disimpan.'); 
+      return; 
+    }
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      const base64String = e.target.result;
+
+      // Kirim PATCH request ke backend
+      const res = await api('/auth/update-avatar', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64Image: base64String })
+      });
+
+      if (res && res.success) {
+        alert('Foto profil Superadmin berhasil diperbarui!');
+        document.getElementById('sidebarAvatar').style.backgroundImage = `url('${base64String}')`;
+        document.getElementById('sidebarAvatar').textContent = '';
+        
+        // Perbarui sesi local storage sementara
+        let localUser = Auth.getUser();
+        localUser.avatar_url = base64String;
+        localStorage.setItem('user', JSON.stringify(localUser));
+      } else {
+        alert('Gagal memperbarui foto profil, silakan coba lagi.');
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // TAB MANAGEMENT
   function showTab(name, el) {
     document.querySelectorAll('[id^="tab-"]').forEach(t => t.style.display = 'none');
     document.getElementById('tab-' + name).style.display = 'block';
@@ -216,6 +280,8 @@
       </table>`;
   }
 
+  // Run Aplikasi
+  initProfile();
   loadOverview();
 </script>
 </body>

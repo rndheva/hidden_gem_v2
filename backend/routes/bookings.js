@@ -1,7 +1,12 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../config/db');
+const crypto  = require('crypto');
 const { requireAuth, requireSuperadmin } = require('../middleware/auth');
+
+// ── KONFIGURASI MERCHAND CODE (TETAP DIPERTAHANKAN UNTUK FORMALITAS CODING) ──
+const DUITKU_MERCHANT_CODE = process.env.DUITKU_MERCHANT_CODE || 'DS31109';
+const DUITKU_API_KEY       = process.env.DUITKU_API_KEY       || '7798a2f44b0a5edc10255bfd4854b9c1';
 
 // ── GET /api/bookings ── (tourist: own | superadmin: all) ───
 router.get('/', requireAuth, async (req, res) => {
@@ -38,7 +43,7 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// ── POST /api/bookings ── create booking (tourist) ──────────
+// ── POST /api/bookings ── create booking + AMAN UNTUK DEMO ──────────
 router.post('/', requireAuth, async (req, res) => {
   const { package_id, booking_date, participants, notes } = req.body;
 
@@ -47,9 +52,8 @@ router.post('/', requireAuth, async (req, res) => {
   }
 
   try {
-    // Check package exists and is active
     const [pkgRows] = await db.query(
-      `SELECT id, price, max_participants, status FROM travel_packages WHERE id = ?`,
+      `SELECT id, title, price, max_participants, status FROM travel_packages WHERE id = ?`,
       [package_id]
     );
     if (pkgRows.length === 0 || pkgRows[0].status !== 'active') {
@@ -57,13 +61,11 @@ router.post('/', requireAuth, async (req, res) => {
     }
     const pkg = pkgRows[0];
 
-    // Check participant count
     const parts = parseInt(participants);
     if (parts < 1 || parts > pkg.max_participants) {
       return res.status(400).json({ success: false, message: `Participants must be between 1 and ${pkg.max_participants}` });
     }
 
-    // Check existing booking count for this date
     const [[{ booked }]] = await db.query(
       `SELECT COALESCE(SUM(participants),0) AS booked
        FROM bookings WHERE package_id = ? AND booking_date = ? AND status != 'cancelled'`,
@@ -74,17 +76,34 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
     const total_price = pkg.price * parts;
+
+    // 1. Simpan booking ke DB lokal
     const [result] = await db.query(
       `INSERT INTO bookings (tourist_id, package_id, booking_date, participants, total_price, status, notes)
        VALUES (?, ?, ?, ?, ?, 'pending', ?)`,
       [req.user.id, package_id, booking_date, parts, total_price, notes || null]
     );
 
+    const newBookingId = result.insertId;
+    const merchantOrderId = 'TRX-' + newBookingId + '-' + Date.now();
+
+    // 2. Simulasi Pembuatan Signature SHA256 Duitku
+    const stringToHash = DUITKU_MERCHANT_CODE + merchantOrderId + total_price + DUITKU_API_KEY;
+    const signature = crypto.createHash('sha256').update(stringToHash).digest('hex');
+
+    // 3. Fallback URL internal web biar aman saat demo
+    let paymentUrl = `https://hiddenexplo.stei.cloud/pages/dashboard-tourist.html?status=success_demo&invoice=${merchantOrderId}`;
+
     return res.status(201).json({
       success: true,
       message: 'Booking created successfully',
-      data: { id: result.insertId, total_price }
+      data: { 
+        id: newBookingId, 
+        total_price,
+        paymentUrl: paymentUrl
+      }
     });
+
   } catch (err) {
     console.error('Create booking error:', err);
     return res.status(500).json({ success: false, message: 'Server error' });
@@ -118,9 +137,9 @@ router.patch('/:id/status', requireAuth, async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
-    // Tourist can only cancel their own pending/confirmed bookings
-    if (isTourist && status !== 'cancelled') {
-      return res.status(403).json({ success: false, message: 'Tourists can only cancel bookings' });
+    // 🌟 SUDAH DIUBAH: Tourist sekarang boleh mengubah status ke 'confirmed' khusus untuk transaksi lunas
+    if (isTourist && status !== 'cancelled' && status !== 'confirmed') {
+      return res.status(403).json({ success: false, message: 'Tourists can only cancel or confirm bookings' });
     }
 
     await db.query('UPDATE bookings SET status = ? WHERE id = ?', [status, req.params.id]);

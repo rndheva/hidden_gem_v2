@@ -178,7 +178,6 @@ router.put('/:id', requireProvider, upload.single('image'), async (req, res) => 
   }
 });
 
-// ── DELETE /api/packages/:id ─────────────────────────────────
 router.delete('/:id', requireProvider, async (req, res) => {
   try {
     const [rows] = await db.query('SELECT provider_id FROM travel_packages WHERE id = ?', [req.params.id]);

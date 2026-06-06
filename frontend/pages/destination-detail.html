@@ -5,6 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Detail Destinasi — Hidden Gem Explorer</title>
   <link rel="stylesheet" href="/css/style.css">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    #map {
+      height: 320px;
+      width: 100%;
+      border-radius: var(--radius-md);
+      z-index: 1;
+    }
+  </style>
 </head>
 <body>
 <nav class="navbar">
@@ -48,6 +62,15 @@
         <div class="card-body">
           <h3 style="color:var(--earth);margin-bottom:var(--space-md)">🏺 Kearifan Lokal & Budaya</h3>
           <p id="destCulture" style="line-height:1.8;color:var(--dark-mid)"></p>
+        </div>
+      </div>
+
+      <!-- MAP SECTION -->
+      <div class="card" style="margin-bottom:var(--space-lg);box-shadow:none;border:1px solid var(--sand-dark)">
+        <div class="card-body">
+          <h3 style="color:var(--forest);margin-bottom:var(--space-md)">📍 Lokasi di Peta</h3>
+          <div id="map"></div>
+          <p id="mapCaption" style="font-size:.8rem;color:var(--stone-light);margin-top:8px;text-align:center"></p>
         </div>
       </div>
 
@@ -98,8 +121,15 @@
         </div>
       </div>
 
+      <!-- Google Maps link -->
+      <a id="gmapsLink" href="#" target="_blank" class="btn btn-outline btn-full" style="margin-bottom:var(--space-sm);display:none">
+        🗺️ Buka di Google Maps
+      </a>
+
       <!-- CTA -->
-      <a href="/pages/packages.html" id="ctaPackages" class="btn btn-primary btn-full" style="display:none">📋 Lihat Semua Paket</a>
+      <a href="/pages/packages.html" id="ctaPackages" class="btn btn-primary btn-full" style="display:none">
+        📋 Lihat Semua Paket
+      </a>
     </div>
   </div>
 </div>
@@ -108,7 +138,6 @@
   <div style="text-align:center;color:rgba(255,255,255,.4);font-size:.85rem">© 2024 Hidden Gem Explorer</div>
 </footer>
 
-<!-- Star input CSS fix -->
 <style>
 .star-input { flex-direction: row-reverse; justify-content: flex-start; }
 .star-input label:hover,
@@ -123,6 +152,7 @@ const destId = params.get('id');
 if (!destId) window.location.href = '/pages/destinations.html';
 
 let destination = null;
+let leafletMap  = null;
 
 async function load() {
   const res = await api(`/destinations/${destId}`);
@@ -137,16 +167,23 @@ function renderDetail(d) {
   // Hero
   document.getElementById('destHero').innerHTML = `
     <div style="position:relative;height:420px;overflow:hidden">
-      <img src="${d.image_url}" alt="${d.name}" onerror="this.src='/images/placeholder.jpg'"
+      <img src="${d.image_url}" alt="${d.name}"
+           onerror="this.src='/images/placeholder.jpg'"
            style="width:100%;height:100%;object-fit:cover">
       <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(28,26,23,.8) 0%,transparent 60%)"></div>
       <div style="position:absolute;bottom:var(--space-xl);left:var(--space-xl);color:white">
-        <div style="font-family:var(--font-mono);font-size:.75rem;letter-spacing:.1em;color:var(--leaf);margin-bottom:8px">📍 ${d.location}, ${d.province}</div>
+        <div style="font-family:var(--font-mono);font-size:.75rem;letter-spacing:.1em;color:var(--leaf);margin-bottom:8px">
+          📍 ${d.location}, ${d.province}
+        </div>
         <h1 style="font-size:clamp(1.5rem,4vw,3rem);color:white;margin-bottom:8px">${d.name}</h1>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${diffBadge(d.difficulty)}<span class="badge badge-water">⏱ ${d.duration}</span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          ${diffBadge(d.difficulty)}
+          <span class="badge badge-water">⏱ ${d.duration}</span>
+        </div>
       </div>
     </div>`;
 
+  // Meta
   document.getElementById('destMeta').innerHTML = `
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
       ${renderStars(d.avg_rating)}
@@ -156,17 +193,43 @@ function renderDetail(d) {
     </div>`;
 
   document.getElementById('destDescription').textContent = d.description;
-  document.getElementById('destCulture').textContent = d.culture_info;
+  document.getElementById('destCulture').textContent     = d.culture_info;
 
   // Quick info
   document.getElementById('quickInfo').innerHTML = `
-    <div style="display:flex;justify-content:space-between;font-size:.875rem"><span style="color:var(--stone)">Lokasi</span><span style="font-weight:500">${d.province}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.875rem"><span style="color:var(--stone)">Durasi Trek</span><span style="font-weight:500">${d.duration}</span></div>
-    <div style="display:flex;justify-content:space-between;font-size:.875rem"><span style="color:var(--stone)">Kesulitan</span><div>${diffBadge(d.difficulty)}</div></div>
-    <div style="display:flex;justify-content:space-between;font-size:.875rem"><span style="color:var(--stone)">Paket Tersedia</span><span style="font-weight:500">${d.packages?.length || 0} paket</span></div>`;
+    <div style="display:flex;justify-content:space-between;font-size:.875rem">
+      <span style="color:var(--stone)">Lokasi</span>
+      <span style="font-weight:500">${d.province}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.875rem">
+      <span style="color:var(--stone)">Durasi Trek</span>
+      <span style="font-weight:500">${d.duration}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.875rem">
+      <span style="color:var(--stone)">Kesulitan</span>
+      <div>${diffBadge(d.difficulty)}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.875rem">
+      <span style="color:var(--stone)">Koordinat</span>
+      <span style="font-family:var(--font-mono);font-size:.75rem">${Number(d.lat).toFixed(4)}, ${Number(d.lng).toFixed(4)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:.875rem">
+      <span style="color:var(--stone)">Paket Tersedia</span>
+      <span style="font-weight:500">${d.packages?.length || 0} paket</span>
+    </div>`;
 
-  // WTF
+  // WTF Score
   renderWTF(document.getElementById('wtfWidget'), d.wtf_instagrammable, d.wtf_access, d.wtf_reviews);
+
+  // Google Maps link
+  const gmapsLink = document.getElementById('gmapsLink');
+  gmapsLink.href = `https://www.google.com/maps?q=${d.lat},${d.lng}`;
+  gmapsLink.style.display = 'block';
+
+  // CTA
+  const cta = document.getElementById('ctaPackages');
+  cta.style.display = 'block';
+  cta.href = `/pages/packages.html?destination_id=${d.id}`;
 
   // Packages
   if (d.packages && d.packages.length) {
@@ -178,31 +241,98 @@ function renderDetail(d) {
             ${diffBadge(p.difficulty)}
           </div>
           <p style="font-size:.8rem;color:var(--stone);margin-bottom:8px">oleh ${p.provider_name}</p>
-          <div style="font-family:var(--font-display);font-size:1.25rem;color:var(--earth);font-weight:700">${fmtPrice(p.price)}</div>
+          <div style="font-family:var(--font-display);font-size:1.25rem;color:var(--earth);font-weight:700">
+            ${fmtPrice(p.price)}
+          </div>
         </div>
       </a>`).join('');
   } else {
-    document.getElementById('packagesGrid').innerHTML = '<p style="color:var(--stone-light)">Belum ada paket trip untuk destinasi ini.</p>';
+    document.getElementById('packagesGrid').innerHTML =
+      '<p style="color:var(--stone-light)">Belum ada paket trip untuk destinasi ini.</p>';
   }
-
-  document.getElementById('ctaPackages').style.display = 'block';
-  document.getElementById('ctaPackages').href = `/pages/packages.html?destination_id=${d.id}`;
 
   // Reviews
   renderReviews(d.reviews || []);
 
   // Show review form for tourists
   const user = Auth.getUser();
-  if (user && user.role === 'tourist') document.getElementById('reviewForm').style.display = 'block';
+  if (user && user.role === 'tourist') {
+    document.getElementById('reviewForm').style.display = 'block';
+  }
+
+  // Init Leaflet map SETELAH semua render selesai
+  initMap(d.lat, d.lng, d.name, d.location);
+}
+
+function initMap(lat, lng, name, location) {
+  // Kalau map sudah pernah diinit, destroy dulu
+  if (leafletMap) {
+    leafletMap.remove();
+    leafletMap = null;
+  }
+
+  // Inisialisasi map
+  leafletMap = L.map('map').setView([lat, lng], 13);
+
+  // Tile layer OpenStreetMap (gratis, tanpa API key)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 18
+  }).addTo(leafletMap);
+
+  // Custom marker icon (hijau sesuai tema)
+  const icon = L.divIcon({
+    html: `<div style="
+      background:var(--forest,#2D5016);
+      color:white;
+      border-radius:50% 50% 50% 0;
+      width:36px;height:36px;
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.1rem;
+      transform:rotate(-45deg);
+      box-shadow:0 4px 12px rgba(0,0,0,.3);
+      border:2px solid white;">
+        <span style="transform:rotate(45deg)">🌊</span>
+      </div>`,
+    className: '',
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+    popupAnchor: [0, -36]
+  });
+
+  // Marker + popup
+  L.marker([lat, lng], { icon })
+    .addTo(leafletMap)
+    .bindPopup(`
+      <div style="font-family:sans-serif;min-width:160px">
+        <strong style="color:#2D5016">${name}</strong><br>
+        <span style="font-size:.8rem;color:#7A7065">📍 ${location}</span><br>
+        <a href="https://www.google.com/maps?q=${lat},${lng}"
+           target="_blank"
+           style="font-size:.8rem;color:#1A6B8A;display:inline-block;margin-top:4px">
+          Buka di Google Maps →
+        </a>
+      </div>`)
+    .openPopup();
+
+  // Caption koordinat
+  document.getElementById('mapCaption').textContent =
+    `Koordinat: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}`;
 }
 
 function renderReviews(reviews) {
   const el = document.getElementById('reviewsList');
-  if (!reviews.length) { el.innerHTML = '<p style="color:var(--stone-light)">Belum ada ulasan. Jadilah yang pertama!</p>'; return; }
+  if (!reviews.length) {
+    el.innerHTML = '<p style="color:var(--stone-light)">Belum ada ulasan. Jadilah yang pertama!</p>';
+    return;
+  }
   el.innerHTML = reviews.map(r => `
     <div style="padding:var(--space-md);border:1px solid var(--sand-dark);border-radius:var(--radius-md);margin-bottom:var(--space-md);background:white">
       <div style="display:flex;align-items:center;gap:var(--space-sm);margin-bottom:var(--space-sm)">
-        <div style="width:36px;height:36px;border-radius:50%;background:var(--forest-light);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.875rem">${r.reviewer_name[0]}</div>
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--forest-light);color:white;
+                    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.875rem">
+          ${r.reviewer_name[0]}
+        </div>
         <div>
           <div style="font-weight:600;font-size:.9rem">${r.reviewer_name}</div>
           <div style="font-size:.75rem;color:var(--stone-light)">${fmtDate(r.created_at)}</div>

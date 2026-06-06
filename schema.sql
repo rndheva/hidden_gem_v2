@@ -1,18 +1,13 @@
 -- ============================================================
--- Hidden Gem Explorer - Database Schema
--- MySQL 8.0+
+-- 1. TABEL USERS (Autentikasi, Role & Status Approval)
 -- ============================================================
+DROP TABLE IF EXISTS reviews;
+DROP TABLE IF EXISTS bookings;
+DROP TABLE IF EXISTS travel_packages;
+DROP TABLE IF EXISTS destinations;
+DROP TABLE IF EXISTS users;
 
-CREATE DATABASE IF NOT EXISTS hidden_gem_explorer
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE hidden_gem_explorer;
-
--- ============================================================
--- USERS TABLE
--- ============================================================
-CREATE TABLE IF NOT EXISTS users (
+CREATE TABLE users (
   id           INT AUTO_INCREMENT PRIMARY KEY,
   fullname     VARCHAR(150)  NOT NULL,
   email        VARCHAR(150)  NOT NULL UNIQUE,
@@ -28,9 +23,9 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- DESTINATIONS TABLE
+-- 2. TABEL DESTINATIONS
 -- ============================================================
-CREATE TABLE IF NOT EXISTS destinations (
+CREATE TABLE destinations (
   id                  INT AUTO_INCREMENT PRIMARY KEY,
   name                VARCHAR(255)   NOT NULL,
   location            VARCHAR(255)   NOT NULL,
@@ -51,9 +46,9 @@ CREATE TABLE IF NOT EXISTS destinations (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- TRAVEL PACKAGES TABLE
+-- 3. TABEL TRAVEL PACKAGES
 -- ============================================================
-CREATE TABLE IF NOT EXISTS travel_packages (
+CREATE TABLE travel_packages (
   id              INT AUTO_INCREMENT PRIMARY KEY,
   provider_id     INT           NOT NULL,
   destination_id  INT           NOT NULL,
@@ -71,16 +66,13 @@ CREATE TABLE IF NOT EXISTS travel_packages (
   created_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   updated_at      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_pkg_provider    FOREIGN KEY (provider_id)    REFERENCES users(id)         ON DELETE CASCADE,
-  CONSTRAINT fk_pkg_destination FOREIGN KEY (destination_id) REFERENCES destinations(id)  ON DELETE CASCADE,
-  INDEX idx_provider    (provider_id),
-  INDEX idx_destination (destination_id),
-  INDEX idx_status      (status)
+  CONSTRAINT fk_pkg_destination FOREIGN KEY (destination_id) REFERENCES destinations(id)  ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- BOOKINGS TABLE
+-- 4. TABEL BOOKINGS
 -- ============================================================
-CREATE TABLE IF NOT EXISTS bookings (
+CREATE TABLE bookings (
   id            INT AUTO_INCREMENT PRIMARY KEY,
   tourist_id    INT           NOT NULL,
   package_id    INT           NOT NULL,
@@ -91,17 +83,14 @@ CREATE TABLE IF NOT EXISTS bookings (
   notes         TEXT          DEFAULT NULL,
   created_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  CONSTRAINT fk_booking_tourist FOREIGN KEY (tourist_id) REFERENCES users(id)            ON DELETE CASCADE,
-  CONSTRAINT fk_booking_package FOREIGN KEY (package_id) REFERENCES travel_packages(id)  ON DELETE CASCADE,
-  INDEX idx_tourist (tourist_id),
-  INDEX idx_package (package_id),
-  INDEX idx_status  (status)
+  CONSTRAINT fk_booking_tourist FOREIGN KEY (tourist_id) REFERENCES users(id)             ON DELETE CASCADE,
+  CONSTRAINT fk_booking_package FOREIGN KEY (package_id) REFERENCES travel_packages(id)  ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- REVIEWS TABLE
+-- 5. TABEL REVIEWS
 -- ============================================================
-CREATE TABLE IF NOT EXISTS reviews (
+CREATE TABLE reviews (
   id             INT AUTO_INCREMENT PRIMARY KEY,
   tourist_id     INT      NOT NULL,
   destination_id INT      NOT NULL,
@@ -112,84 +101,31 @@ CREATE TABLE IF NOT EXISTS reviews (
   updated_at     TIMESTAMP  DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uq_review (tourist_id, destination_id),
   CONSTRAINT fk_review_tourist      FOREIGN KEY (tourist_id)     REFERENCES users(id)        ON DELETE CASCADE,
-  CONSTRAINT fk_review_destination  FOREIGN KEY (destination_id) REFERENCES destinations(id) ON DELETE CASCADE,
-  INDEX idx_destination (destination_id),
-  INDEX idx_tourist     (tourist_id)
+  CONSTRAINT fk_review_destination  FOREIGN KEY (destination_id) REFERENCES destinations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- SEED: SUPERADMIN
--- Password: SuperAdmin@2024!
--- ============================================================
-INSERT INTO users (fullname, email, password, role, status) VALUES
-('Super Administrator', 'superadmin@hiddengemexplorer.id',
- '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj2NdQ4H5q/.',
- 'superadmin', 'approved');
 
 -- ============================================================
--- SEED: DESTINATIONS (pakai URL gambar langsung)
+-- DATA INITIAL SEEDING (Pengisian Ulang Data Segar)
 -- ============================================================
-INSERT INTO destinations
-  (name, location, province, image_url, description, difficulty, duration,
-   culture_info, wtf_instagrammable, wtf_access, wtf_reviews, lat, lng)
-VALUES
-(
-  'Curug Leuwi Hejo',
-  'Sentul, Bogor',
-  'West Java',
-  'https://panduanwisata.b-cdn.net/wp-content/uploads/2021/05/Curug-Leuwi-Hejo-by-@sunday.sofun_.jpg',
-  'Known for its crystal-clear turquoise water and multiple tiers of pools. The trail offers a mix of paved paths and rocky terrains, perfect for a refreshing trail run.',
-  'Moderate',
-  '30-45 mins',
-  'Local villagers maintain the area and often share stories of the Curug''s healing properties.',
-  5, 4, 5,
-  -6.58780000, 106.90140000
-),
-(
-  'Sekumpul Waterfall',
-  'Singaraja, Buleleng',
-  'Bali',
-  'https://images.unsplash.com/photo-1552603305-181079bc7973?q=80&w=1000&auto=format&fit=crop',
-  'Often cited as the most beautiful waterfall in Bali. It consists of seven waterfalls in one area. The trek is challenging with steep stairs and slippery paths.',
-  'Hard',
-  '60-90 mins',
-  'The waterfall is located within a traditional Balinese village area where Subak irrigation systems are still prominent.',
-  5, 3, 5,
-  -8.17320000, 115.18150000
-),
-(
-  'Sipiso-piso',
-  'Tongging, Karo',
-  'North Sumatra',
-  'https://images.unsplash.com/photo-1626081464303-36c5890989f6?q=80&w=1000&auto=format&fit=crop',
-  'One of Indonesia''s tallest waterfalls, dropping into the Karo highlands. The view from the top is breathtaking, but the trail to the bottom is a steep, leg-burning staircase.',
-  'Hard',
-  '45-60 mins',
-  'The Batak Karo people reside here, and their traditional "Siwaluh Jabu" houses can be seen nearby.',
-  5, 4, 4,
-  2.91670000, 98.52500000
-),
-(
-  'Tumpak Sewu',
-  'Lumajang – Malang Border',
-  'East Java',
-  'https://images.unsplash.com/photo-1605280766158-947ca6233486?q=80&w=1000&auto=format&fit=crop',
-  'Literally translated as "Thousand Waterfalls". It looks like a giant curtain of water. Reaching the base requires descending through bamboo ladders and riverbeds.',
-  'Expert',
-  '90-120 mins',
-  'Considered a sacred site by many locals in the Tenggerese highlands.',
-  5, 2, 5,
-  -8.23110000, 112.91610000
-),
-(
-  'Curug Cikaso',
-  'Surade, Sukabumi',
-  'West Java',
-  'https://images.unsplash.com/photo-1589182373726-e4f658ab50f0?q=80&w=1000&auto=format&fit=crop',
-  'Featuring three distinct falls side by side. It''s relatively hidden and usually reached by a short boat ride or a pleasant trail run through rice fields.',
-  'Easy',
-  '20-30 mins',
-  'The area is rich in Sundanese culture and traditional farming practices.',
-  4, 4, 4,
-  -7.35970000, 106.61860000
-);
+
+-- Masukkan Superadmin Baru yang Pasti Berhasil Login
+-- Email: superadmin@hiddengemexplorer.id | Password asli: SuperAdmin@2024!
+INSERT INTO users (id, fullname, email, password, role, status) VALUES
+(1, 'Super Administrator', 'superadmin@hiddengemexplorer.id', 'SuperAdmin@2024!', 'superadmin', 'approved');
+
+-- Masukkan 5 Destinasi Utama
+INSERT INTO destinations (id, name, location, province, image_url, description, difficulty, duration, culture_info, wtf_instagrammable, wtf_access, wtf_reviews, lat, lng) VALUES
+(1, 'Curug Leuwi Hejo', 'Sentul, Bogor', 'West Java', 'https://mundomaya.travel/wp-content/uploads/2021/08/Curug-Leuwi-Hejo.jpg', 'Known for its crystal-clear turquoise water and multiple tiers of pools.', 'Moderate', '30-45 mins', 'Local villagers maintain the area.', 5, 4, 5, -6.58780000, 106.90140000),
+(2, 'Sekumpul Waterfall', 'Singaraja, Buleleng', 'Bali', 'https://i1.wp.com/www.balistarisland.com/wp-content/uploads/2016/03/sekumpulwaterfall01.jpg?fit=1200%2C650&ssl=1#aqua_resizer_image_not_local', 'Often cited as the most beautiful waterfall in Bali.', 'Hard', '60-90 mins', 'The waterfall is located within a traditional Balinese village.', 5, 3, 5, -8.17320000, 115.18150000),
+(3, 'Sipiso-piso', 'Tongging, Karo', 'North Sumatra', 'https://img.freepik.com/free-photo/sipiso-piso-waterfall-famous-travel-landmarkin-berastagi-lake-toba-sumatra-indonesia_107467-77.jpg?size=626&ext=jpg', 'One of Indonesia''s tallest waterfalls.', 'Hard', '45-60 mins', 'The Batak Karo people reside here.', 5, 4, 4, 2.91670000, 98.52500000),
+(4, 'Tumpak Sewu', 'Lumajang – Malang Border', 'East Java', 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/17/97/b7/6f/tumpak-sewu-waterfalls.jpg?w=1200&h=-1&s=1', 'Literally translated as "Thousand Waterfalls".', 'Expert', '90-120 mins', 'Considered a sacred site by many locals.', 5, 2, 5, -8.23110000, 112.91610000),
+(5, 'Curug Cikaso', 'Surade, Sukabumi', 'West Java', 'https://tempatwisataseru.com/wp-content/uploads/2017/10/Keindahan-Curug-Cikaso-Sukabumi.jpg', 'Featuring three distinct falls side by side.', 'Easy', '20-30 mins', 'The area is rich in Sundanese culture.', 4, 4, 4, -7.35970000, 106.61860000);
+
+-- Masukkan 5 Paket Wisata Lengkap
+INSERT INTO travel_packages (id, provider_id, destination_id, title, description, price, difficulty, duration, max_participants, image_url, itinerary, includes, excludes, status) VALUES 
+(1, 1, 1, 'One Day Trekking & Trail Run Curug Leuwi Hejo', 'Nikmati kesegaran air turunan pegunungan di Sentul Bogor.', 150000.00, 'Moderate', '1 Hari', 10, 'https://mundomaya.travel/wp-content/uploads/2021/08/Curug-Leuwi-Hejo.jpg', '[]', '[]', '[]', 'active'),
+(2, 1, 2, 'The Secret Seven: Sekumpul Waterfalls Trekking Tour', 'Eksplorasi megahnya rahasia alam Bali Utara.', 450000.00, 'Hard', '1 Hari', 6, 'https://www.nopostcode.com/wp-content/uploads/2022/10/Sekumpul-Waterfall-38.jpg', '[]', '[]', '[]', 'active'),
+(3, 1, 3, 'Karo Highlands Heritage & Sipiso-piso Waterfall', 'Melihat langsung keindahan air terjun tertinggi di Danau Toba.', 300000.00, 'Hard', '1 Hari', 12, 'https://authentic-indonesia.com/wp-content/uploads/2020/08/mingle-with-the-beauty-of-Sipiso-piso-Waterfall.jpg', '[]', '[]', '[]', 'active'),
+(4, 1, 4, 'Ekspedisi Air Terjun Seribu Tirai Tumpak Sewu', 'Petualangan ekstrem menuruni tebing bambu.', 350000.00, 'Expert', '1 Hari', 8, 'https://dynamic-media-cdn.tripadvisor.com/media/photo-o/17/97/b7/6f/tumpak-sewu-waterfalls.jpg?w=1200&h=-1&s=1', '[]', '[]', '[]', 'active'),
+(5, 1, 5, 'Explore Hidden Paradise: Curug Cikaso Sukabumi', 'Wisata santai menikmati indahnya tiga air terjun kembar.', 250000.00, 'Easy', '1 Hari', 15, 'https://tempatwisataseru.com/wp-content/uploads/2017/10/Keindahan-Curug-Cikaso-Sukabumi.jpg', '[]', '[]', '[]', 'active');
